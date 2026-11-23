@@ -840,6 +840,34 @@ html,body{background:var(--bg)}
 .pettyrow .accmono .ico{width:20px;height:20px}
 .pettyic{background:var(--accent);color:var(--on-lime)}
 .sheet .btn .ico{width:16px;height:16px;margin-right:4px;vertical-align:-3px}
+/* record sheet: read first, edit on request */
+.txd-amt{font-family:var(--display);font-size:30px;font-weight:800;letter-spacing:-.02em;margin:12px 0 2px}
+.txd-narr{color:var(--ink-2);margin-bottom:4px}
+.txd-rows{margin:12px 0 4px;border-radius:18px;background:var(--raise);padding:2px 14px}
+.txd-row{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:46px;padding:8px 0;border-top:1px solid var(--grid);font-size:14px}
+.txd-row:first-child{border-top:0}
+.txd-row > span{color:var(--muted);flex:0 0 auto}
+.txd-row > b{font-weight:600;text-align:right;min-width:0;overflow-wrap:anywhere}
+.txd-row.tap{cursor:pointer}
+.txd-row.tap > b::after{content:"";display:inline-block;width:7px;height:7px;margin-left:10px;border-right:2px solid var(--muted);border-top:2px solid var(--muted);transform:rotate(45deg) translateY(-2px)}
+.txd-cat{display:inline-flex;align-items:center;gap:8px}
+.txd-cat i{width:24px;height:24px;border-radius:8px;display:inline-grid;place-items:center}
+.txd-cat i .ico{width:14px;height:14px}
+.txd-ref{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;font-weight:500}
+.txd-foot{display:flex;gap:8px;margin-top:16px;align-items:center}
+.txd-foot .btn .ico{width:16px;height:16px;margin-right:4px;vertical-align:-3px}
+/* account lives at the bottom of the side menu on wide screens; the top-right circle is for phones */
+.tabbar .sideme{display:none!important}
+@media (min-width:1024px){
+  .top .topr .avatar{display:none}
+  .tabbar .sideme{display:flex!important;margin-top:auto!important;height:auto!important;min-height:60px;padding:10px 12px!important;gap:12px;align-items:center;border-radius:18px!important;background:rgba(255,255,255,.06)!important;color:#fff!important;text-align:left}
+  .tabbar .sideme:hover{background:rgba(255,255,255,.10)!important}
+  .sideme-av{flex:0 0 auto;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#C6F432;color:#14161A;font-weight:700;font-size:13px}
+  .sideme-t{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+  .sideme-t b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sideme-t small{font-size:12px;color:#A7ADB3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sideme > .ico{flex:0 0 auto;width:16px!important;height:16px!important;color:#A7ADB3}
+}
 </style>
 </head>
 <body><div id="blobs" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i></div>
@@ -870,6 +898,7 @@ html,body{background:var(--bg)}
   <button data-t="accounts"><svg class="ico g" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z M2 10h20"/></svg>Accounts</button>
   <button data-t="tx"><svg class="ico g" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01"/></svg>Activity</button>
   <button data-t="budget"><svg class="ico g" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>Categories</button>
+  <button class="sideme" id="sideMe" type="button" aria-label="Your account and settings"><span class="sideme-av" id="sideMeAv">·</span><span class="sideme-t"><b id="sideMeName">Your account</b><small id="sideMeSub">Account and settings</small></span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
 </nav>
 <button class="fab hidden" id="addBtn" aria-label="Add a transaction"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="fabl">Add</span></button>
 <div id="sheetRoot"></div>
@@ -1634,7 +1663,7 @@ function render() {
 }
 
 /* ============ Egom Business (business.js): invoices, quotes, customers, reports ============ */
-const BIZ_VERSION = "10";   // raise with every business.js update so phones fetch the new copy
+const BIZ_VERSION = "13";   // raise with every business.js update so phones fetch the new copy
 let bizLoading = null;
 function loadBusiness() {
   if (window.EgomBusiness) return Promise.resolve(window.EgomBusiness);
@@ -2411,30 +2440,56 @@ function wireCatPage(sp, c) {
 function openTx(id) {
   const r = rows.find((x) => x.id === id); if (!r) return;
   const cats = catsFor(r.space, r.kind) || [];
-  $("sheetRoot").innerHTML = `<div class="bg" id="sbg"><div class="sheet">
-    <div style="display:flex;justify-content:space-between;align-items:center"><h4>${esc(r.counterparty || "Transaction")}</h4><button class="btn" id="sx">${icon("close")}</button></div>
-    <div style="color:var(--muted);font-size:13px;margin-top:4px">${esc(r.tx_date)} ${esc((r.tx_time || "").slice(0, 5))} · ${esc(r.bank || "")} ${r.reference ? "· Ref " + esc(r.reference) : ""}</div>
-    <div style="font-size:26px;font-weight:800;margin:10px 0" class="${r.kind === "income" ? "inc" : "exp"}">${r.kind === "income" ? "+" : "-"}${money(r.kind === "expense" ? spend(r) : r.amount)}</div>
-    ${r.narration ? `<div style="color:var(--ink-2)">“${esc(r.narration)}”</div>` : ""}
-    <label>Category</label><select id="eCat">${(cats.includes(r.category) ? cats : [r.category, ...cats]).map((c) => `<option ${c === r.category ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
-    <div class="${hasBiz() ? "" : "hidden"}"><label>Ledger</label><select id="eSp"><option value="personal" ${r.space === "personal" ? "selected" : ""}>Personal</option><option value="business" ${r.space === "business" ? "selected" : ""}>${esc(bizName())}</option></select></div>
-    <label>Type</label><select id="eKind"><option value="expense" ${r.kind === "expense" ? "selected" : ""}>Expense</option><option value="income" ${r.kind === "income" ? "selected" : ""}>Money in</option><option value="transfer" ${r.kind === "transfer" ? "selected" : ""}>Own transfer (not spending)</option></select>
-    <label>Note</label><input id="eNote" value="${esc(r.note || "")}" placeholder="e.g. Lekki job">
-    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn danger" id="eDel">Delete</button><div style="flex:1"></div>${r.kind === "expense" ? `<button class="btn" id="eCopy" title="Add the same spending again, dated today">${icon("copy")}Copy</button>` : ""}<button class="btn primary" id="eSave">Save</button></div>
+  const KIND = { expense: "Expense", income: "Money in", transfer: "Own transfer (not spending)" };
+  const when = `${prettyDay(r.tx_date)}${r.tx_time ? " · " + esc(r.tx_time.slice(0, 5)) : ""}`;
+  $("sheetRoot").innerHTML = `<div class="bg" id="sbg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="txdT">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h4 id="txdT" style="min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(r.counterparty || "Transaction")}</h4><button class="btn" id="sx" aria-label="Close">${icon("close")}</button></div>
+    <div class="txd-amt ${r.kind === "income" ? "inc" : r.kind === "transfer" ? "" : "exp"}">${r.kind === "income" ? "+" : r.kind === "transfer" ? "" : "−"}${money(r.kind === "expense" ? spend(r) : r.amount)}</div>
+    ${r.narration ? `<div class="txd-narr">“${esc(r.narration)}”</div>` : ""}
+    <div id="txdBody"></div>
+    <div class="txd-foot" id="txdFoot"></div>
   </div></div>`;
   const close = () => $("sheetRoot").innerHTML = "";
   $("sx").onclick = close; $("sbg").onclick = (e) => { if (e.target.id === "sbg") close(); };
-  const refreshCats = () => {
-    const sp = $("eSp").value, kind = $("eKind").value, cs = catsFor(sp, kind);
-    const cur = $("eCat").value;
-    const guess = cs.includes(cur) ? cur : kind === "income" ? EX.incomeCategory(`${r.narration || ""} ${r.counterparty || ""} ${r.note || ""}`, sp) : (sp === "business" ? r.category_business : r.category_personal);
-    $("eCat").innerHTML = cs.map((c) => `<option ${c === guess ? "selected" : ""}>${esc(c)}</option>`).join("");
+  const row = (k, v, on) => `<div class="txd-row${on ? " tap" : ""}"${on ? ` role="button" tabindex="0" data-edit="1"` : ""}><span>${k}</span><b>${v}</b></div>`;
+  // Reading first: details as plain rows; Edit opens the fields
+  const view = () => {
+    $("txdBody").innerHTML = `<div class="txd-rows">
+      ${row("Category", `<span class="txd-cat"><i style="background:${colorOf(r.category)[0]};color:${colorOf(r.category)[1]}">${catIcon(r.category)}</i>${esc(r.category || "Other")}</span>`, true)}
+      ${hasBiz() ? row("Ledger", r.space === "business" ? esc(bizName()) : "Personal") : ""}
+      ${row("Type", KIND[r.kind] || "Expense")}
+      ${row("Date", when)}
+      ${r.bank ? row(r.kind === "income" ? "Paid into" : "Paid from", esc(r.bank)) : ""}
+      ${r.kind === "expense" && Number(r.fee) ? row("Bank charge", money(Number(r.fee))) : ""}
+      ${r.reference ? row("Reference", `<span class="txd-ref">${esc(r.reference)}</span>`) : ""}
+      ${r.note ? row("Note", esc(r.note)) : ""}
+    </div>`;
+    $("txdFoot").innerHTML = `<button class="btn danger" id="eDel">Delete</button><div style="flex:1"></div>${r.kind === "expense" ? `<button class="btn" id="eCopy" title="Add the same spending again, dated today">${icon("copy")}Copy</button>` : ""}<button class="btn primary" id="eEdit">${icon("pen")}Edit</button>`;
+    let armed = false;
+    $("eDel").onclick = () => { if (!armed) { armed = true; $("eDel").textContent = "Tap again to delete"; return; } close(); deleteRow(id); };
+    if ($("eCopy")) $("eCopy").onclick = () => { close(); openRecord(todayISO(), "expense", { amount: Number(r.amount) || "", to: r.counterparty || "", sp: r.space, cat: r.category, acc: r.bank || "", note: r.note || "" }); };
+    $("eEdit").onclick = edit;
+    document.querySelectorAll("#txdBody [data-edit]").forEach((el) => { el.onclick = edit; el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); edit(); } }; });
   };
-  $("eSp").onchange = refreshCats; $("eKind").onchange = refreshCats;
-  if ($("eCopy")) $("eCopy").onclick = () => { close(); openRecord(todayISO(), "expense", { amount: Number(r.amount) || "", to: r.counterparty || "", sp: r.space, cat: r.category, acc: r.bank || "", note: r.note || "" }); };
-  let armed = false;
-  $("eDel").onclick = () => { if (!armed) { armed = true; $("eDel").textContent = "Tap again to delete"; return; } close(); deleteRow(id); };
-  $("eSave").onclick = () => { const patch = {}; if ($("eCat").value !== r.category) patch.category = $("eCat").value; if ($("eSp").value !== r.space) patch.space = $("eSp").value; if ($("eKind").value !== r.kind) patch.kind = $("eKind").value; if ($("eNote").value.trim() !== (r.note || "")) patch.note = $("eNote").value.trim() || null; close(); if (Object.keys(patch).length) updateRow(id, patch); };
+  const edit = () => {
+    $("txdBody").innerHTML = `
+      <label for="eCat">Category</label><select id="eCat">${(cats.includes(r.category) ? cats : [r.category, ...cats]).map((c) => `<option ${c === r.category ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
+      <div class="${hasBiz() ? "" : "hidden"}"><label for="eSp">Ledger</label><select id="eSp"><option value="personal" ${r.space === "personal" ? "selected" : ""}>Personal</option><option value="business" ${r.space === "business" ? "selected" : ""}>${esc(bizName())}</option></select></div>
+      <label for="eKind">Type</label><select id="eKind">${Object.entries(KIND).map(([k, l]) => `<option value="${k}" ${r.kind === k ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <label for="eNote">Note</label><input id="eNote" value="${esc(r.note || "")}" placeholder="e.g. Lekki job">`;
+    $("txdFoot").innerHTML = `<button class="btn" id="eCancel">Cancel</button><div style="flex:1"></div><button class="btn primary" id="eSave">Save</button>`;
+    const refreshCats = () => {
+      const sp = $("eSp").value, kind = $("eKind").value, cs = catsFor(sp, kind);
+      const cur = $("eCat").value;
+      const guess = cs.includes(cur) ? cur : kind === "income" ? EX.incomeCategory(`${r.narration || ""} ${r.counterparty || ""} ${r.note || ""}`, sp) : (sp === "business" ? r.category_business : r.category_personal);
+      $("eCat").innerHTML = cs.map((c) => `<option ${c === guess ? "selected" : ""}>${esc(c)}</option>`).join("");
+    };
+    $("eSp").onchange = refreshCats; $("eKind").onchange = refreshCats;
+    $("eCancel").onclick = view;
+    $("eSave").onclick = () => { const patch = {}; if ($("eCat").value !== r.category) patch.category = $("eCat").value; if ($("eSp").value !== r.space) patch.space = $("eSp").value; if ($("eKind").value !== r.kind) patch.kind = $("eKind").value; if ($("eNote").value.trim() !== (r.note || "")) patch.note = $("eNote").value.trim() || null; close(); if (Object.keys(patch).length) updateRow(id, patch); };
+    $("eCat").focus();
+  };
+  view();
 }
 
 /* ============ wiring ============ */
@@ -2468,6 +2523,9 @@ function showApp() {
   const nm = (profile?.full_name || "").trim().split(/\s+/).filter(Boolean);
   const initial = (nm.length ? nm.slice(0, 2).map((w) => w[0]).join("") : (profile?.email || "·")[0]).toUpperCase();
   $("meBtn").textContent = initial;
+  $("sideMeAv").textContent = initial;
+  $("sideMeName").textContent = (profile?.full_name || "").trim() || "Your account";
+  $("sideMeSub").textContent = profile?.email || "Account and settings";
   renderWaNudge();
 }
 const authErr = (msg) => { const el = $("authErr"); if (el) { el.textContent = msg; el.classList.toggle("hidden", !msg); } };
@@ -2857,6 +2915,7 @@ function openSettings() {
   };
 }
 $("meBtn").onclick = openSettings;
+$("sideMe").onclick = openSettings;
 
 // ---- Start ------------------------------------------------------------------------------
 async function start() {

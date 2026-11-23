@@ -28,6 +28,9 @@
   const P = {
     home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
     copy: "M9 9h11v11H9z M5 15H4V4h11v1",
+    chevDown: "m6 9 6 6 6-6", chevL: "m15 6-6 6 6 6", chevR: "m9 6 6 6-6 6", dots: "M5 12h.01 M12 12h.01 M19 12h.01",
+    bag: "M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M8 6V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1 M3 12h18",
+    user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M4 21a8 8 0 0 1 16 0",
     check: "M20 6 9 17l-5-5",
     cart: "M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H6.2 M9 20.5h.01 M17 20.5h.01",
     doc: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M8 13h8 M8 17h5",
@@ -189,7 +192,7 @@
       b.type = "button"; b.dataset.bt = k; b.className = "bz-tab";
       b.innerHTML = `<svg class="ico g" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>${label}`;
       b.onclick = () => { if (S.tab === k) return; S.tab = k; S.filter = "all"; saveUi(); draw(); window.scrollTo(0, 0); };
-      bar.appendChild(b);
+      bar.insertBefore(b, $("sideMe") || null);
     });
     $("addBtn").addEventListener("click", onAdd, true);
     document.body.classList.add("bz-on");
@@ -200,7 +203,7 @@
     document.querySelectorAll("#tabbar .bz-tab").forEach((b) => b.remove());
     S.hiddenTabs.forEach((b) => b.classList.remove("hidden"));
     $("addBtn").removeEventListener("click", onAdd, true);
-    document.body.classList.remove("bz-on");
+    document.body.classList.remove("bz-on", "bz-home");
   }
   function onAdd(e) { e.stopImmediatePropagation(); e.preventDefault(); openAddSheet(); }
 
@@ -238,6 +241,7 @@
     }
     v.dataset.tab = "biz-" + S.tab;
     S.docMode = S.tab === "quotes" ? "quotes" : "invoices";
+    document.body.classList.toggle("bz-home", S.tab === "home");
     const sub = ["customers", "items", "reports", "purchases", "vendors"].includes(S.tab);
     const backTo = S.tab === "vendors" ? "purchases" : "more";
     v.innerHTML = `<div class="bz">${sub ? `<button class="bz-back" id="bzBack" type="button">${svg(P.back, 18)} ${backTo === "more" ? "More" : "Purchases"}</button>` : ""}${({ home: homeView, docs: docsView, quotes: docsView, more: moreView, customers: customersView, items: itemsView, reports: reportsView, purchases: purchasesView, vendors: vendorsView })[S.tab]()}</div>`;
@@ -265,17 +269,21 @@
     const spentOnly = !mIn && mOut > 0;
     const delta = !spentOnly && prevProfit && prevProfit > 0 ? Math.round((profit - prevProfit) / prevProfit * 100) : null;
     return `
-      <div class="bz-row bz-head"><span class="bz-row bz-gap bz-grow"><h2>${esc(S.biz.name)}</h2></span><button class="bz-icon" id="bzSettings" type="button" aria-label="Business details">${svg(P.gear)}</button></div>
+      <div class="bz-row bz-head"><button class="bz-switch" id="bzSwitch" type="button" aria-haspopup="dialog" aria-label="${esc(S.biz.name)}. Switch between Personal and Business">
+          <span class="bz-switch-ic">${svg(P.bag, 16)}</span><h2>${esc(S.biz.name)}</h2>${svg(P.chevDown, 18)}</button>
+</div>
       <section class="g-hero">
-        <div class="gh-top"><div><p class="gl">${spentOnly ? "Spent this month" : profit < 0 ? "Loss this month" : "Profit this month"}</p><p class="gbig">${profit < 0 && !spentOnly ? "−" : ""}${K(Math.abs(profit))}</p></div>
+        <div class="gh-month" role="group" aria-label="Month"><button type="button" id="bzPrevM" aria-label="Previous month">${svg(P.chevL, 16)}</button><b>${esc(new Date(ymNow + "-15").toLocaleDateString("en-GB", { month: "long", year: ymNow.slice(0, 4) === today().slice(0, 4) ? undefined : "numeric" }))}</b><button type="button" id="bzNextM" aria-label="Next month">${svg(P.chevR, 16)}</button></div>
+        <div class="gh-top"><div><p class="gl">${(spentOnly ? "Spent" : profit < 0 ? "Loss" : "Profit") + (ymNow === today().slice(0, 7) ? " this month" : "")}</p><p class="gbig">${profit < 0 && !spentOnly ? "−" : ""}${K(Math.abs(profit))}</p></div>
           ${delta !== null ? `<p class="bz-delta ${delta < 0 ? "dn" : ""}">${delta < 0 ? "▼" : "▲"} ${Math.abs(delta)}% vs last month</p>` : ""}</div>
         ${(() => { const sp = E().heroSpark ? E().heroSpark() : ""; return sp ? `<div class="gspark">${sp}</div>` : ""; })()}
         <div class="gh-io"><div><p class="gl">Money in</p><p class="gv" style="color:#C6F432">+${K(mIn)}</p></div><div><p class="gl">Money out</p><p class="gv">−${K(mOut)}</p></div></div>
       </section>
       <div class="bz-grid2">
-        <button class="gt solid bz-amber" id="bzOwed" type="button">
-          <div class="gtr"><span class="gchip dark">${svg(P.doc, 17)}</span><span class="bz-small">${open.length} invoice${open.length === 1 ? "" : "s"}</span></div>
-          <div><p class="gn">Owed to you</p><p class="gamt xl">${K(owed)}</p></div></button>
+        <button class="gt ${late.length ? "solid bz-amber" : ""}" id="bzOwed" type="button">
+          <div class="gtr"><span class="gchip ${late.length ? "dark" : ""}" ${late.length ? "" : `style="background:var(--accent-soft);color:var(--accent-ink)"`}>${svg(P.doc, 17)}</span>${late.length ? `<span class="bz-latepill">${late.length} late</span>` : ""}</div>
+          <div><p class="gn">Owed to you</p><p class="gamt xl">${K(owed)}</p>
+          <p class="gs">${open.length ? `${open.length} open invoice${open.length === 1 ? "" : "s"}${late.length ? " · " + shortK(lateAmt) + " late" : ""}` : "Nothing open"}</p></div></button>
         <button class="gt" id="bzMoney" type="button">
           <div class="gtr"><span class="gchip" style="background:rgba(95,211,190,.18);color:#5FD3BE">${svg(P.bank, 17)}</span></div>
           <div><p class="gn">Cash and bank</p><p class="gamt xl">${neg ? "—" : (money < 0 ? "−" : "") + K(Math.abs(money))}</p>
@@ -319,9 +327,12 @@
       </div></div>`;
   }
   function wireHome() {
-    $("bzSettings").onclick = openSettings;
+    if ($("bzSettings")) $("bzSettings").onclick = openSettings;
     $("bzOwed").onclick = () => { S.tab = "docs"; S.docMode = "invoices"; S.filter = "unpaid"; saveUi(); draw(); };
     $("bzMoney").onclick = () => { S.tab = "banks"; saveUi(); draw(); window.scrollTo(0, 0); };
+    $("bzSwitch").onclick = openLedgerSwitch;
+    $("bzPrevM").onclick = () => $("prevM").click();
+    $("bzNextM").onclick = () => $("nextM").click();
     if ($("bzOwe")) $("bzOwe").onclick = () => { S.tab = "purchases"; S.filter = S.purchases.some(pLate) ? "late" : "unpaid"; saveUi(); draw(); window.scrollTo(0, 0); };
     if ($("bzDrafts")) $("bzDrafts").onclick = () => { S.tab = "docs"; S.filter = "draft"; saveUi(); draw(); window.scrollTo(0, 0); };
     if ($("bzWaitQ")) $("bzWaitQ").onclick = () => { S.tab = "quotes"; S.filter = "open"; saveUi(); draw(); window.scrollTo(0, 0); };
@@ -436,9 +447,10 @@
         ${inv.status !== "draft" && inv.status !== "void" ? `<button type="button" id="bziWa">${svg(P.wa)}<span>${open ? "Remind" : "WhatsApp"}</span></button>` : ""}
         ${inv.status !== "void" ? `<button type="button" id="bziPdf">${svg(P.pdf)}<span>PDF</span></button>` : ""}
         ${inv.status !== "void" ? `<button type="button" id="bziEdit">${svg(P.pen)}<span>Edit</span></button>` : ""}
-        <button type="button" id="bziCopy">${svg(P.copy)}<span>Copy</span></button>
-        ${inv.status === "draft" ? `<button type="button" id="bziDel">${svg(P.trash)}<span>Delete</span></button>` : ""}
-        ${owner && inv.status !== "void" && inv.status !== "draft" && !inv.paid_kobo ? `<button type="button" id="bziVoid">${svg(P.x)}<span>Void</span></button>` : ""}
+        <div class="bz-morewrap"><button type="button" class="bz-morebtn" aria-haspopup="menu" aria-expanded="false">${svg(P.dots, 22)}<span>More</span></button>
+          <div class="bz-menu" role="menu" hidden><button type="button" role="menuitem" id="bziCopy">${svg(P.copy)}<span>Copy as new invoice</span></button>
+        ${inv.status === "draft" ? `<button type="button" role="menuitem" class="danger" id="bziDel">${svg(P.trash)}<span>Delete draft</span></button>` : ""}
+        ${owner && inv.status !== "void" && inv.status !== "draft" && !inv.paid_kobo ? `<button type="button" role="menuitem" class="danger" id="bziVoid">${svg(P.x)}<span>Void invoice</span></button>` : ""}</div></div>
       </div>
       <section class="bz-panel"><h5 class="bz-h5">What it's for</h5>
         ${ls.map((l) => `<div class="bz-li"><span class="bz-grow"><b>${esc(l.name)}</b><small>${esc(l.description ? l.description + " · " : "")}${Number(l.quantity)}${l.unit ? " " + esc(l.unit) : ""} × ${K2(l.rate_kobo)}</small></span><b>${K(l.amount_kobo)}</b></div>`).join("")}
@@ -511,9 +523,10 @@
         ${q.status !== "invoiced" ? `<button type="button" id="bzqWa">${svg(P.wa)}<span>WhatsApp</span></button>` : ""}
         <button type="button" id="bzqPdf">${svg(P.pdf)}<span>PDF</span></button>
         ${q.status !== "invoiced" ? `<button type="button" id="bzqEdit">${svg(P.pen)}<span>Edit</span></button>` : ""}
-        ${q.status === "sent" || q.status === "draft" ? `<button type="button" id="bzqYes">${svg(P.check)}<span>Accepted</span></button><button type="button" id="bzqNo">${svg(P.x)}<span>Declined</span></button>` : ""}
-        <button type="button" id="bzqCopy">${svg(P.copy)}<span>Copy</span></button>
-        ${q.status !== "invoiced" ? `<button type="button" id="bzqDel">${svg(P.trash)}<span>Delete</span></button>` : ""}
+        <div class="bz-morewrap"><button type="button" class="bz-morebtn" aria-haspopup="menu" aria-expanded="false">${svg(P.dots, 22)}<span>More</span></button>
+          <div class="bz-menu" role="menu" hidden>${q.status === "sent" || q.status === "draft" ? `<button type="button" role="menuitem" id="bzqYes">${svg(P.check)}<span>Mark accepted</span></button><button type="button" role="menuitem" id="bzqNo">${svg(P.x)}<span>Mark declined</span></button>` : ""}
+        <button type="button" role="menuitem" id="bzqCopy">${svg(P.copy)}<span>Copy as new quote</span></button>
+        ${q.status !== "invoiced" ? `<button type="button" role="menuitem" class="danger" id="bzqDel">${svg(P.trash)}<span>Delete quote</span></button>` : ""}</div></div>
       </div>
       <section class="bz-panel"><h5 class="bz-h5">What it's for</h5>
         ${ls.map((l) => `<div class="bz-li"><span class="bz-grow"><b>${esc(l.name)}</b><small>${Number(l.quantity)}${l.unit ? " " + esc(l.unit) : ""} × ${K2(l.rate_kobo)}</small></span><b>${K(l.amount_kobo)}</b></div>`).join("")}
@@ -1002,8 +1015,9 @@
       ${pOpen(p) ? `<button class="bz-btn primary wide big" id="bzpuPay" type="button">${svg(P.up, 20)} Pay vendor</button>` : ""}
       <div class="bz-acts">
         <button type="button" id="bzpuEdit">${svg(P.pen)}<span>Edit</span></button>
-        <button type="button" id="bzpuCopy">${svg(P.copy)}<span>Copy</span></button>
-        <button type="button" id="bzpuDel">${svg(P.trash)}<span>Delete</span></button></div>
+        <div class="bz-morewrap"><button type="button" class="bz-morebtn" aria-haspopup="menu" aria-expanded="false">${svg(P.dots, 22)}<span>More</span></button>
+          <div class="bz-menu" role="menu" hidden><button type="button" role="menuitem" id="bzpuCopy">${svg(P.copy)}<span>Copy as new purchase</span></button>
+        <button type="button" role="menuitem" class="danger" id="bzpuDel">${svg(P.trash)}<span>Delete purchase</span></button></div></div></div>
       <section class="bz-panel"><h5 class="bz-h5">What you bought · ${esc(p.category)}</h5>
         ${ls.map((l) => `<div class="bz-li"><span class="bz-grow"><b>${esc(l.name)}</b><small>${Number(l.quantity)}${l.unit ? " " + esc(l.unit) : ""} × ${K2(l.rate_kobo)}</small></span><b>${K(l.amount_kobo)}</b></div>`).join("")}
         <div class="bz-row bz-total"><span>Total</span><span>${K(p.total_kobo)}</span></div></section>
@@ -1211,9 +1225,24 @@
   }
 
   /* ---------------- REPORTS ---------------- */
+  // Months (yyyy-mm) from one date to another
+  function monthsIn(from, to) { const out = []; let [y, m] = from.slice(0, 7).split("-").map(Number); const end = to.slice(0, 7);
+    for (let i = 0; i < 40; i++) { const k = y + "-" + pad2(m); out.push(k); if (k >= end) break; m++; if (m > 12) { m = 1; y++; } } return out; }
   function reportsView() {
-    const r = S.report || {}, sales = r.sales || 0, spent = r.spent || 0, profit = sales - spent;
-    const months = (r.months || []).slice(-6), max = Math.max(1, ...months.map((m) => Math.max(m.in, m.out)));
+    const r = S.report || {};
+    // Money received (default) counts what actually came in and went out, the same as Home.
+    // Invoiced counts sales on the day the invoice is sent, the way an accountant measures profit.
+    const cashOK = !!(E() && E().monthIO), basis = cashOK && S.basis !== "invoiced" ? "received" : "invoiced";
+    const [pFrom, pTo] = periodRange();
+    let sales = r.sales || 0, spent = r.spent || 0, months = (r.months || []).slice(-6);
+    if (basis === "received") {
+      const io = monthsIn(pFrom, pTo).map((k) => E().monthIO(k));
+      sales = Math.round(io.reduce((a, x) => a + x.in, 0) * 100); spent = Math.round(io.reduce((a, x) => a + x.out, 0) * 100);
+      const endYm = pTo.slice(0, 7), [ey, em] = endYm.split("-").map(Number), startD = new Date(ey, em - 6, 1);
+      months = monthsIn(startD.getFullYear() + "-" + pad2(startD.getMonth() + 1) + "-01", pTo).map((k) => { const x = E().monthIO(k); return { month: k, in: Math.round(x.in * 100), out: Math.round(x.out * 100) }; });
+    }
+    const profit = sales - spent;
+    const max = Math.max(1, ...months.map((m) => Math.max(m.in, m.out)));
     const notDue = r.not_due_kobo || 0, l30 = r.late_1_30_kobo || 0, l60 = r.late_31_60_kobo || 0, l90 = r.late_60_kobo || 0, owed = notDue + l30 + l60 + l90;
     const by = S.spendBy === "job" ? (r.spent_by_job || []) : (r.spent_by_category || []);
     const top = by.reduce((a, x) => Math.max(a, x.kobo), 1);
@@ -1222,11 +1251,13 @@
     return `
       <div class="bz-row bz-head"><h2>Reports</h2><button class="bz-btn sm" id="bzCsv" type="button">${svg(P.pdf, 16)} For my accountant</button></div>
       <div class="bz-seg three" role="group" aria-label="Period">${Object.entries(label).map(([k, l]) => `<button type="button" data-p="${k}" class="${S.period === k ? "on" : ""}" aria-pressed="${S.period === k}">${l}</button>`).join("")}</div>
+      ${cashOK ? `<div class="bz-chips small" role="group" aria-label="Count money">${[["received", "Money received"], ["invoiced", "Invoiced"]].map(([k, l]) => `<button type="button" data-basis="${k}" class="${basis === k ? "on" : ""}" aria-pressed="${basis === k}">${l}</button>`).join("")}</div>` : ""}
       <section class="g-hero"><p class="gl" style="margin-bottom:12px">Did we make money?</p>
-        <div class="bz-row"><span class="gl">Sales</span><b class="gv" style="color:#C6F432">${K(sales)}</b></div>
+        <div class="bz-row"><span class="gl">${basis === "received" ? "Money in" : "Sales invoiced"}</span><b class="gv" style="color:#C6F432">${K(sales)}</b></div>
         <div class="bz-row" style="margin-top:8px"><span class="gl">Spent</span><b class="gv">−${K(spent)}</b></div>
         <div class="bz-row bz-total light"><span>${profit < 0 ? "Loss" : "Profit"}</span><span class="bz-big">${profit < 0 ? "−" : ""}${K(Math.abs(profit))}</span></div>
-        ${kept !== null && profit > 0 ? `<p class="bz-sub">You kept ₦${kept} of every ₦100 you made.</p>` : ""}</section>
+        ${kept !== null && profit > 0 ? `<p class="bz-sub">You kept ₦${kept} of every ₦100 ${basis === "received" ? "that came in" : "you invoiced"}.</p>` : ""}
+        <p class="bz-sub bz-basis">${basis === "received" ? "Counts money when it actually comes in or goes out, the same as Home." : "Counts a sale on the day you send the invoice, paid or not. This is how your accountant measures profit."}</p></section>
       <section class="gcard bz-card"><div class="bz-row"><h3>Last 6 months</h3><span class="bz-legend"><i class="lime"></i>In <i></i>Out</span></div>
         ${months.length ? `<div class="bz-bars" role="img" aria-label="Money in and out by month">${months.map((m) => `<div><div class="bz-bb"><i class="lime" style="height:${Math.round(m.in / max * 120)}px"></i><i style="height:${Math.round(m.out / max * 120)}px"></i></div>
           <span>${new Date(m.month + "-15").toLocaleDateString("en-GB", { month: "short" })}</span></div>`).join("")}</div>` : `<p class="fine">Nothing recorded yet.</p>`}</section>
@@ -1243,6 +1274,7 @@
   function wireReports() {
     document.querySelectorAll("[data-p]").forEach((b) => b.onclick = async () => { S.period = b.dataset.p; saveUi(); try { await loadReport(); } catch (e) { E().toast(e.message); } draw(); });
     document.querySelectorAll("[data-sb]").forEach((b) => b.onclick = () => { S.spendBy = b.dataset.sb; draw(); });
+    document.querySelectorAll("[data-basis]").forEach((b) => b.onclick = () => { S.basis = b.dataset.basis; draw(); });
     $("bzCsv").onclick = exportCsv;
   }
   function exportCsv() {
@@ -1265,13 +1297,28 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
+  // Tapping the business name: pick Personal or this business
+  function openLedgerSwitch() {
+    const close = sheet("bzls", esc(S.biz.name), `
+      <div class="bz-panel">
+        <button type="button" class="bz-li btn-li" id="bzlsSet">${svg(P.gear)}<span class="bz-grow"><b>Business details</b><small>Logo, colour, bank details and invoice numbers</small></span>${svg(P.chevR, 16)}</button>
+      </div>
+      <h5 class="bz-h5">Switch to</h5>
+      <div class="bz-panel">
+        <button type="button" class="bz-li btn-li" data-led="personal">${svg(P.user)}<span class="bz-grow"><b>Personal</b><small>Your own money</small></span></button>
+        <button type="button" class="bz-li btn-li on" data-led="business">${svg(P.bag)}<span class="bz-grow"><b>${esc(S.biz.name)}</b><small>Invoices, quotes, purchases and the business books</small></span>${svg(P.check, 18)}</button>
+      </div>`);
+    $("bzlsSet").onclick = () => { close(); openSettings(); };
+    document.querySelectorAll("[data-led]").forEach((b) => b.onclick = () => { close(); const t = document.querySelector(`#ledgerSeg [data-l="${b.dataset.led}"]`); if (t) t.click(); });
+  }
+
   /* ---------------- ADD sheet ---------------- */
   function openAddSheet() {
     const close = sheet("bza", "Add", `
       <div class="bz-addgrid">
         <button type="button" id="bzaInv" class="lime">${svg(P.docPlus, 24)}<span><b>New invoice</b><small>Bill a customer</small></span></button>
         <button type="button" id="bzaQuote">${svg(P.quote, 24)}<span><b>New quote</b><small>Turns into an invoice</small></span></button>
-        <button type="button" id="bzaPaid"><span class="bz-limeic">${svg(P.down, 24)}</span><span><b>I got paid</b><small>Against an invoice</small></span></button>
+        <button type="button" id="bzaPaid"><span class="bz-limeic">${svg(P.down, 24)}</span><span><b>I got paid</b><small>From a customer</small></span></button>
         <button type="button" id="bzaSpent">${svg(P.up, 24)}<span><b>I spent money</b><small>Receipt, statement or type it</small></span></button>
       </div>
       <div class="bz-panel">
@@ -1524,6 +1571,13 @@
   let cssDone = false;
   function injectCss() {
     if (cssDone) return; cssDone = true;
+    // "More" menus on invoice, quote and purchase sheets
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest(".bz-morebtn");
+      document.querySelectorAll(".bz-menu:not([hidden])").forEach((m) => { if (!btn || m !== btn.nextElementSibling) { m.hidden = true; m.previousElementSibling.setAttribute("aria-expanded", "false"); } });
+      if (btn) { const m = btn.nextElementSibling; m.hidden = !m.hidden; btn.setAttribute("aria-expanded", String(!m.hidden)); }
+    });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".bz-menu:not([hidden])").forEach((m) => { m.hidden = true; }); });
     const s = document.createElement("style"); s.id = "bzCss";
     s.textContent = `
 .bz{display:flex;flex-direction:column;gap:12px}
@@ -1619,6 +1673,28 @@
 .bz-bar{height:10px;border-radius:5px;background:rgba(255,255,255,.14);overflow:hidden;margin-top:8px}.bz-bar i{display:block;height:100%;border-radius:5px;background:#C6F432}
 .bz-fine{font-size:12px;font-weight:500;color:#C9CDD1}.bz-fine .bz-paid{color:#C6F432}
 .bz-acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:8px;margin-top:10px}
+.bz-morewrap{position:relative;display:grid}
+.bz-acts .bz-morewrap > button{width:100%}
+.bz-menu{position:absolute;right:0;bottom:calc(100% + 8px);z-index:5;min-width:220px;padding:6px;border-radius:18px;background:var(--card-solid,var(--bg));border:1px solid var(--line);box-shadow:0 18px 40px -12px rgba(0,0,0,.35);display:flex;flex-direction:column}
+.bz-menu[hidden]{display:none}
+.bz-acts .bz-menu button{flex-direction:row;justify-content:flex-start;height:46px;padding:0 12px;gap:12px;border:0;border-radius:12px;background:none;font-size:14px;font-weight:600;text-align:left}
+.bz-acts .bz-menu button:hover,.bz-acts .bz-menu button:focus-visible{background:var(--raise)}
+.bz-acts .bz-menu button.danger{color:var(--exp)}
+.bz-latepill{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:99px;background:rgba(20,22,26,.14);color:#14161A}
+.bz-switch{display:flex;align-items:center;gap:8px;min-width:0;padding:6px 12px 6px 6px;margin-left:-6px;border:0;border-radius:99px;background:none;color:var(--ink);font:inherit;cursor:pointer}
+.bz-switch h2{flex:0 1 auto;min-width:0;width:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0}
+.bz-head .bz-switch{flex:1 1 auto;justify-content:flex-start;max-width:100%}.bz-head .bz-switch,.bz-head .bz-switch:hover{background:none !important;box-shadow:none !important;border:0 !important}.bz-head .bz-switch:hover h2{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px}
+.bz-switch:hover{background:var(--raise)}
+.bz-switch > .ico:last-child{flex:0 0 auto;color:var(--muted)}
+.bz-switch-ic{flex:0 0 auto;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--bg)}
+.g-hero .gh-month{position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:2px;height:34px;padding:0 4px;border-radius:99px;background:rgba(255,255,255,.10);color:#fff;font-size:13px}
+.g-hero .gh-month button{width:28px;height:28px;border:0;border-radius:50%;background:none;color:inherit;display:grid;place-items:center;cursor:pointer}
+.g-hero .gh-month button:hover{background:rgba(255,255,255,.14)}
+.g-hero .gh-month b{padding:0 4px;font-weight:600}
+.g-hero{position:relative}
+.bz .g-hero .gh-top{flex-direction:column;align-items:flex-start;gap:6px}
+.bz-basis{opacity:.7;margin-top:10px !important}
+body.bz-on.bz-home #ledRow,body.bz-on.bz-home .top .mpill{display:none}
 .bz-acts button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;height:72px;border-radius:20px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
 .bz-panel{margin-top:14px;padding:6px 16px;border-radius:20px;background:var(--bg);border:1px solid var(--line)}
 .bz-panel>.bz-row{padding:10px 0}
