@@ -471,7 +471,7 @@ html,body{background:var(--bg)}
 .auth{background:transparent}
 .app{padding:calc(env(safe-area-inset-top) + 8px) 14px calc(env(safe-area-inset-bottom) + 120px)}
 /* glass surfaces */
-.card,.day,.list,.linkcard,.wa-nudge,.choice button,.addopt,.w,.banner,.hero,.gcard,.gt,.auth-form input,.perks{background:var(--glass)!important;-webkit-backdrop-filter:blur(12px) saturate(140%);backdrop-filter:blur(12px) saturate(140%);box-shadow:var(--glass-edge);border:0!important}
+.card,.day,.list,.linkcard,.wa-nudge,.choice button,.addopt,.w,.banner,.hero,.gcard,.gt,.auth-form input,.perks{background:var(--glass)!important;-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(12px) saturate(140%);box-shadow:var(--glass-edge);border:0!important}
 .card,.day,.list,.gcard{border-radius:28px}
 .sheet{background:var(--surface)}
 .sheet select,.sheet input,.incform input,.incform select,.rin,.bud .lim,.amtwrap,.addopt #tTxt{background:var(--field)!important}
@@ -798,13 +798,20 @@ html,body{background:var(--bg)}
 .installcard .gchip{background:var(--accent);color:var(--on-lime)}
 .installcard .btn.primary{height:36px;padding:0 16px}
 
-/* onboarding choices: a clear selected state on top of the glass */
-.choice button{position:relative}
-.choice button.on{box-shadow:inset 0 0 0 2px var(--indicator),var(--glass-edge)!important}
-.choice button.on::after{content:"";position:absolute;top:12px;right:12px;width:22px;height:22px;border-radius:50%;background:#C6F432 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230E0E0E' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center/14px no-repeat}
-.kinds{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 2px}
-.kinds button{border:0;border-radius:14px;padding:12px 12px;min-height:46px;text-align:left;font-weight:600;font-size:14px;line-height:1.2;cursor:pointer;color:var(--ink);background:var(--glass,var(--surface));box-shadow:var(--glass-edge,inset 0 0 0 1px var(--line));-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
-.kinds button.on{box-shadow:inset 0 0 0 2px var(--indicator),var(--glass-edge,none);font-weight:700}
+/* ---- sign-in: password + code, security sheet ---- */
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:64px!important}
+.pw-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--muted);font-weight:700;font-size:13px;padding:6px 8px;cursor:pointer}
+.or-row{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12.5px;margin:4px 0}
+.or-row::before,.or-row::after{content:"";flex:1;height:1px;background:var(--line)}
+.auth-form .btn.big:not(.primary){background:var(--surface);border:1px solid var(--line)}
+.fine .linkbtn{font-size:inherit;padding:0;color:var(--accent);font-weight:700}
+.qrbox{display:flex;justify-content:center;margin:8px 0}
+.qrbox img{background:#fff;border-radius:14px;padding:10px;width:180px;height:180px;image-rendering:pixelated}
+.secret-row{display:flex;gap:8px;align-items:center;justify-content:space-between;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 12px}
+.secret-row code{font-size:13px;letter-spacing:.04em;word-break:break-all;color:var(--ink)}
+.sheet .auth-form input{background:var(--bg)!important}
+#auth .fine .linkbtn,#auth .fine.center .linkbtn,#mfaOut{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
 </style>
 </head>
 <body><div id="blobs" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i></div>
@@ -853,29 +860,6 @@ const BUSINESS_CATEGORIES                           = {
   general: ["Stock & Inventory", "Materials & Supplies", "Staff Salaries", "Contractors & Labour", "Logistics & Delivery", "Vehicle & Fuel", "Rent & Office", "Utilities & Internet", "Marketing & Ads", "Software & Subscriptions", "Tools & Equipment", "Travel", "Professional Fees", "Taxes & Compliance", "Bank Charges", "Customer Refunds", "Other"],
   solar: ["Solar Equipment", "Installation Materials", "Installer & Labour Payouts", "Logistics & Delivery", "Vehicle & Fuel", "Staff Salaries", "Marketing & Ads", "Software & Subscriptions", "Office Rent & Upkeep", "Utilities & Internet", "Tools & Equipment", "Travel & Site Visits", "Professional Fees", "Taxes & Compliance", "Bank Charges", "Customer Refunds", "Other"],
 };
-// Kinds of business people can pick. Each kind adds its own categories (with keywords)
-// in front of the general business list. "solar" and "general" keep their own lists above.
-const BUSINESS_KINDS = [
-  ["retail", "Shop & retail"], ["food", "Food & restaurant"], ["fashion", "Fashion & beauty"],
-  ["services", "Professional services"], ["tech", "Tech & online"], ["transport", "Transport & logistics"],
-  ["agric", "Farming & agro"], ["building", "Building & real estate"], ["health", "Health & pharmacy"],
-  ["education", "School & training"], ["events", "Events & media"], ["solar", "Solar & energy"],
-  ["general", "Something else"],
-];
-const SECTORS = {
-  retail: { cats: { "Packaging": ["packaging", "nylon", "nylons", "bags", "cartons", "boxes", "labels", "stickers"], "POS & Card Charges": ["pos", "pos charge", "card charge", "terminal", "settlement fee"] }, signals: ["shop", "store", "stock", "customer", "pos", "goods"] },
-  food: { cats: { "Ingredients & Food Stock": ["ingredients", "foodstuff", "rice", "beans", "groundnut oil", "palm oil", "pepper", "tomatoes", "onions", "meat", "chicken", "fish", "flour", "sugar", "spices", "market"], "Gas & Cooking Fuel": ["gas", "cooking gas", "lpg", "gas refill", "charcoal", "firewood"], "Packaging": ["packaging", "takeaway", "take away", "pack", "nylon", "foil", "plates", "cups"] }, signals: ["restaurant", "kitchen", "catering", "food", "order", "customer"] },
-  fashion: { cats: { "Fabrics & Materials": ["fabric", "fabrics", "ankara", "lace", "aso oke", "thread", "zip", "zips", "buttons", "lining", "material"], "Beauty Supplies": ["hair", "attachment", "wig", "braids", "relaxer", "nail", "nails", "lashes", "makeup", "cosmetics", "salon products"] }, signals: ["tailor", "salon", "boutique", "client", "customer", "fabric"] },
-  services: { cats: { "Client Entertainment": ["client lunch", "client dinner", "entertainment", "refreshments"], "Training & Courses": ["course", "courses", "training", "certification", "workshop", "conference", "seminar"] }, signals: ["client", "consulting", "consultancy", "project", "invoice", "retainer"] },
-  tech: { cats: { "Hosting & Cloud": ["hosting", "server", "aws", "google cloud", "azure", "vercel", "supabase", "cloudflare", "domain", "digitalocean", "firebase"], "Devices & Gadgets": ["laptop", "phone", "iphone", "macbook", "tablet", "monitor", "charger", "gadget", "gadgets"] }, signals: ["app", "software", "client", "subscription", "hosting", "developer"] },
-  transport: { cats: { "Vehicle Repairs": ["mechanic", "repair", "repairs", "spare parts", "servicing", "tyre", "tyres", "vulcanizer", "brake", "engine"], "Drivers & Riders": ["driver", "drivers", "rider", "riders", "dispatch rider"], "Tolls & Levies": ["toll", "levy", "levies", "union", "park ticket", "agbero", "lcc", "permit"] }, signals: ["trip", "delivery", "dispatch", "waybill", "rider", "driver", "haulage"] },
-  agric: { cats: { "Seeds & Feed": ["seed", "seeds", "seedlings", "feed", "feeds", "chicks", "fingerlings", "layers mash", "grower", "starter"], "Fertiliser & Chemicals": ["fertiliser", "fertilizer", "npk", "urea", "herbicide", "pesticide", "insecticide", "chemicals"], "Animal Health": ["vet", "veterinary", "vaccine", "vaccines", "vitamins", "medication"], "Farm Labour": ["farm hand", "farmhands", "labourers", "weeding", "harvest", "clearing"] }, signals: ["farm", "poultry", "crops", "birds", "pond", "harvest", "feed", "eggs"] },
-  building: { cats: { "Building Materials": ["cement", "blocks", "sand", "granite", "iron rod", "rods", "roofing", "tiles", "paint", "plumbing", "pop", "timber", "wood"], "Site Labour": ["mason", "bricklayer", "carpenter", "plumber", "labourer", "workmanship", "iron bender", "tiler", "site work"], "Equipment Hire": ["hire", "rental", "scaffold", "scaffolding", "mixer", "excavator", "tipper"] }, signals: ["site", "project", "client", "building", "construction", "property", "tenant"] },
-  health: { cats: { "Drugs & Medical Supplies": ["drugs", "medicine", "medicines", "syringes", "gloves", "consumables", "medical supplies", "test kits"], "Lab & Medical Equipment": ["lab", "laboratory", "reagents", "bp monitor", "glucometer", "medical equipment"] }, signals: ["patient", "patients", "clinic", "pharmacy", "hospital", "drugs"] },
-  education: { cats: { "Teaching Materials": ["books", "textbooks", "chalk", "markers", "teaching aids", "uniforms", "stationery"], "Exam & Registration Fees": ["waec", "neco", "jamb", "exam fee", "exam fees", "registration", "accreditation"] }, signals: ["school", "student", "students", "pupils", "parents", "tuition", "fees"] },
-  events: { cats: { "Equipment Hire": ["hire", "rental", "sound", "lights", "screen", "generator hire", "camera hire"], "Crew & Freelancers": ["crew", "freelancer", "freelance", "photographer", "videographer", "editor", "dj", "mc", "usher", "ushers", "sound engineer"], "Venue & Decor": ["venue", "hall", "decor", "decoration", "canopy", "chairs", "tables", "flowers", "stage"] }, signals: ["event", "client", "booking", "show", "shoot", "production", "wedding"] },
-};
-for (const [k, s] of Object.entries(SECTORS)) BUSINESS_CATEGORIES[k] = [...Object.keys(s.cats), ...BUSINESS_CATEGORIES.general.filter((c) => !(c in s.cats))];
 // Money in gets its own short list, the same for personal and business
 const INCOME_CATEGORIES = ["Salary", "Sales & Customer Payments", "Gifts & Support", "Refunds & Reversals", "Loans & Investment", "Other Income"];
 const INCOME_KEYWORDS                           = {
@@ -954,7 +938,6 @@ const KEYWORDS                                                        = {
     "Bank Charges": ["bank charge", "charges", "sms alert", "stamp duty", "maintenance fee", "commission", "transfer fee"],
   },
 };
-for (const [k, sec] of Object.entries(SECTORS)) KEYWORDS[k] = { ...sec.cats, ...KEYWORDS.general };
 
 const BANKS = ["OPay", "Moniepoint", "Kuda", "PalmPay", "GTBank", "Guaranty Trust", "Access", "Zenith", "UBA", "First Bank", "FirstBank", "Fidelity", "FCMB", "Sterling", "Wema", "ALAT", "Union Bank", "Stanbic", "Ecobank", "Polaris", "Providus", "Keystone", "Jaiz", "Carbon", "Paystack", "Flutterwave", "Paga", "Fairmoney", "VFD", "Globus", "Titan", "Lotus", "Taj", "Parallex", "Unity Bank", "Heritage", "Standard Chartered", "Citibank", "Moremonee", "Rubies"];
 
@@ -1080,7 +1063,6 @@ const BUSINESS_SIGNALS                           = {
   general: ["client", "customer", "supplier", "stock", "inventory", "wholesale", "logistics", "salary", "salaries", "staff", "office", "shop", "materials", "waybill", "invoice", "contractor"],
   solar: ["solar", "panel", "panels", "inverter", "inverters", "battery", "batteries", "installer", "installation", "client", "customer", "site", "logistics", "salary", "salaries", "deye", "lithium", "office", "materials", "waybill"],
 };
-for (const [k, sec] of Object.entries(SECTORS)) BUSINESS_SIGNALS[k] = [...new Set([...BUSINESS_SIGNALS.general, ...sec.signals])];
 
 function guessSpace(text        , preset        , businessName = "")               {
   const t = norm(text);
@@ -1377,7 +1359,7 @@ async function readPdf(pdfjs, data, password) {
   return { pages, text, numPages: doc.numPages };
 }
 
-return { parseReceiptText, parseManual, spaceFromOwner, categorize, categoriesFor, listFor, incomeCategory, INCOME_CATEGORIES, PERSONAL_CATEGORIES, BUSINESS_CATEGORIES, BUSINESS_KINDS, norm, parseStatementPages, readPdf };
+return { parseReceiptText, parseManual, spaceFromOwner, categorize, categoriesFor, listFor, incomeCategory, INCOME_CATEGORIES, PERSONAL_CATEGORIES, BUSINESS_CATEGORIES, norm, parseStatementPages, readPdf };
 })();
 </script>
 <script type="module">
@@ -1398,7 +1380,7 @@ const ICON = {
 // pastel tile colours: [tile background, icon circle]
 const SOLIDS = ["#16813A","#2F6FD6","#D9822B","#7C4DCC","#C8463C","#1A9C9C","#B8860B","#C2477F","#4A7A2C","#5B6B8C","#8E5B3A","#3E7A00"];
 const PASTELS = SOLIDS.map((c) => [c + "1F", c]);
-const ALL_CATS = [...new Set([...EX.PERSONAL_CATEGORIES, ...EX.BUSINESS_CATEGORIES.solar, ...EX.BUSINESS_CATEGORIES.general, ...Object.values(EX.BUSINESS_CATEGORIES).flat()])];
+const ALL_CATS = [...new Set([...EX.PERSONAL_CATEGORIES, ...EX.BUSINESS_CATEGORIES.solar, ...EX.BUSINESS_CATEGORIES.general])];
 const HUES = {
   light: ["#A35F00", "#2753C9", "#0F7262", "#6A3FD1", "#B4234A", "#4A7300"],
   dark: ["#FFC266", "#8FB0FF", "#5FD3BE", "#B9A0FF", "#FF8FA8", "#B6E06A"],
@@ -1464,12 +1446,7 @@ const CAT_ICON = {
   "Giving & Church": "heart", "Gifts & Support": "heart", "Shopping & Personal Care": "bag", "Health": "health", "Entertainment": "play",
   "Subscriptions": "repeat", "Software & Subscriptions": "laptop", "Savings & Investment": "trend", "Loans & Investment": "trend",
   "Bank Charges": "bank", "Taxes & Compliance": "scale", "Professional Fees": "scale", "Marketing & Ads": "megaphone", "Tools & Equipment": "tool",
-  "Customer Refunds": "undo", "Refunds & Reversals": "undo",
-  "Packaging": "box", "POS & Card Charges": "card", "Ingredients & Food Stock": "cart", "Gas & Cooking Fuel": "bolt", "Fabrics & Materials": "bag", "Beauty Supplies": "bag",
-  "Client Entertainment": "food", "Training & Courses": "chart", "Hosting & Cloud": "laptop", "Devices & Gadgets": "laptop", "Vehicle Repairs": "tool", "Drivers & Riders": "people",
-  "Tolls & Levies": "scale", "Seeds & Feed": "box", "Fertiliser & Chemicals": "box", "Animal Health": "health", "Farm Labour": "people", "Building Materials": "box",
-  "Site Labour": "people", "Equipment Hire": "tool", "Drugs & Medical Supplies": "health", "Lab & Medical Equipment": "health", "Teaching Materials": "box",
-  "Exam & Registration Fees": "scale", "Crew & Freelancers": "people", "Venue & Decor": "home", "Salary": "briefcase", "Sales & Customer Payments": "receipt", "Other Income": "in", "Other": "dot",
+  "Customer Refunds": "undo", "Refunds & Reversals": "undo", "Salary": "briefcase", "Sales & Customer Payments": "receipt", "Other Income": "in", "Other": "dot",
 };
 const catIcon = (c) => icon((profile?.home_prefs?.cat_icons || {})[c] || CAT_ICON[c] || "dot");
 // Logo: the two-bar symbol (lime = money in, white outline = money out) + the egóm wordmark
@@ -1701,10 +1678,10 @@ function swallowNextClick() {
   const done = () => { document.removeEventListener("click", h, true); clearTimeout(tm); };
   document.addEventListener("click", h, true); const tm = setTimeout(done, 1500);
 }
-function sheet(id, title, inner) {
+function sheet(id, title, inner, onClose) {
   $("sheetRoot").innerHTML = `<div class="bg" id="${id}bg"><div class="sheet">
     <div style="display:flex;justify-content:space-between;align-items:center"><h4>${title}</h4><button class="btn" id="${id}x" aria-label="Close">${icon("close")}</button></div>${inner}</div></div>`;
-  const close = () => ($("sheetRoot").innerHTML = "");
+  const close = () => { $("sheetRoot").innerHTML = ""; if (onClose) { const f = onClose; onClose = null; f(); } };
   // ignore the click that lifting the finger after a press-and-hold sends to the backdrop
   const opened = Date.now();
   $(id + "x").onclick = close; $(id + "bg").onclick = (e) => { if (e.target.id === id + "bg" && Date.now() - opened > 700) close(); };
@@ -2327,47 +2304,133 @@ function showApp() {
 const authErr = (msg) => { const el = $("authErr"); if (el) { el.textContent = msg; el.classList.toggle("hidden", !msg); } };
 function busy(btn, on, label) { if (!btn) return; btn.disabled = on; if (label) btn.textContent = label; }
 
-// ---- 1. Email ------------------------------------------------------------------
+// ---- 1. Email (+ password, or a code by email) ---------------------------------------
+let afterCodeSetPassword = false;   // "Forgot password?": sign in with a code, then choose a new password
 function screenEmail() {
   showAuth(`
     <h1 class="hero-h">Your money, organised.</h1>
     <p class="hero-p">Sign in or create your free account to get started.</p>
     <form id="emailForm" class="auth-form">
       <label for="emailIn">Your email</label>
-      <input id="emailIn" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required value="${esc(authEmail)}">
-      <button class="btn primary big" id="emailGo" type="submit">Continue</button>
+      <input id="emailIn" type="email" inputmode="email" autocomplete="username email" placeholder="you@example.com" required value="${esc(authEmail)}">
+      <label for="pwIn">Password</label>
+      <div class="pw-wrap"><input id="pwIn" type="password" autocomplete="current-password" placeholder="Your password"><button type="button" class="pw-eye" id="pwEye" aria-label="Show password">Show</button></div>
+      <button class="btn primary big" id="pwGo" type="submit">Sign in</button>
       <div id="authErr" class="auth-err hidden"></div>
-      <p class="fine">We'll email you a 6-digit code. No password.</p>
+      <div class="or-row"><span>or</span></div>
+      <button class="btn big" id="emailGo" type="button">Email me a code</button>
+      <p class="fine">New to Egom? Tap <b>Email me a code</b> to create your free account. You can add a password later. <button type="button" class="linkbtn" id="forgotPw">Forgot password?</button></p>
     </form>
     ${demo ? `<p class="fine" style="text-align:center"><a href="#" id="demoSkip">Skip to the sample dashboard</a></p>` : ""}`);
+  const readEmail = () => {
+    authEmail = $("emailIn").value.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(authEmail)) { authErr("That email doesn't look right."); return false; }
+    return true;
+  };
+  $("pwEye").onclick = () => { const i = $("pwIn"), show = i.type === "password"; i.type = show ? "text" : "password"; $("pwEye").textContent = show ? "Hide" : "Show"; };
   $("emailForm").onsubmit = async (e) => {
     e.preventDefault();
-    authEmail = $("emailIn").value.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(authEmail)) return authErr("That email doesn't look right.");
+    if (!readEmail()) return;
+    const password = $("pwIn").value;
+    if (!password) { authErr("Type your password, or tap Email me a code."); return $("pwIn").focus(); }
+    busy($("pwGo"), true, "Signing in…");
+    const err = await signInPassword(password);
+    if (err) { busy($("pwGo"), false, "Sign in"); return authErr(err); }
+    await continueSignIn();
+  };
+  const codeFlow = async (forgot) => {
+    if (!readEmail()) return;
+    afterCodeSetPassword = forgot;
     busy($("emailGo"), true, "Sending code…");
     const err = await sendCode();
-    if (err) { busy($("emailGo"), false, "Continue"); return authErr(err); }
+    if (err) { busy($("emailGo"), false, "Email me a code"); return authErr(err); }
     screenCode();
   };
+  $("emailGo").onclick = () => codeFlow(false);
+  $("forgotPw").onclick = () => codeFlow(true);
   if ($("demoSkip")) $("demoSkip").onclick = (e) => { e.preventDefault(); profile = { ...DEMO_PROFILE }; enterApp(); };
+}
+async function signInPassword(password) {
+  if (demo) {
+    if (password !== "egom-demo-1") return "That email and password don't match. Forgot it? Tap Forgot password.";
+    profile = { ...DEMO_PROFILE, email: authEmail }; return null;
+  }
+  const { data, error } = await sb.auth.signInWithPassword({ email: authEmail, password });
+  if (error) {
+    if (/rate|too many/i.test(error.message)) return "Too many tries just now. Wait a minute and try again.";
+    if (/not confirmed/i.test(error.message)) return "Confirm your email first: tap Email me a code.";
+    return "That email and password don't match. No password yet? Tap Email me a code.";
+  }
+  session = data.session;
+  return null;
 }
 async function sendCode() {
   if (demo) { resendAt = Date.now() + 45000; return null; }
   const { error } = await sb.auth.signInWithOtp({ email: authEmail, options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname } });
   if (error) {
-    if (/rate|limit|too many/i.test(error.message)) return "Too many codes sent just now. Wait a minute and try again.";
-    return "Couldn't send the code: " + error.message;
+    if (/rate|limit|too many|security purposes/i.test(error.message)) return "Too many codes sent just now. Wait a minute and try again.";
+    return "Couldn't send the code. Try again in a minute, or sign in with your password.";
   }
   resendAt = Date.now() + 45000;
   return null;
 }
+
+// ---- Two-step: the code from an authenticator app ----------------------------------------
+async function needsSecondStep() {
+  if (demo) return !!demoMfa.on && !demoMfa.passed;
+  try {
+    const { data } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    return data && data.currentLevel === "aal1" && data.nextLevel === "aal2";
+  } catch { return false; }
+}
+async function continueSignIn() {
+  if (await needsSecondStep()) return screenMfa();
+  await afterSignIn();
+  if (afterCodeSetPassword) { afterCodeSetPassword = false; openSecurity("password"); }
+}
+function screenMfa() {
+  showAuth(`
+    <h2 class="step-h">Two-step verification</h2>
+    <p class="step-p">Open your authenticator app (Google Authenticator, Microsoft Authenticator, 1Password…) and type the 6-digit code for <b>Egom</b>.</p>
+    <form id="mfaForm" class="auth-form">
+      <input id="mfaIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="••••••" required>
+      <button class="btn primary big" id="mfaGo" type="submit">Verify</button>
+      <div id="authErr" class="auth-err hidden"></div>
+    </form>
+    <p class="fine center">Lost your phone? Email <a href="mailto:hello@egreenconcept.com">hello@egreenconcept.com</a> from this email address and we'll help you back in.</p>
+    <p class="fine center"><button class="linkbtn" id="mfaOut">Use a different account</button></p>`);
+  const inp = $("mfaIn"); inp.focus();
+  inp.oninput = () => { inp.value = inp.value.replace(/\D/g, "").slice(0, 6); if (inp.value.length === 6) $("mfaForm").requestSubmit(); };
+  $("mfaForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const code = inp.value.trim();
+    if (!/^\d{6}$/.test(code)) return authErr("Enter all 6 digits.");
+    busy($("mfaGo"), true, "Checking…");
+    const err = await verifyMfa(code);
+    if (err) { busy($("mfaGo"), false, "Verify"); inp.value = ""; return authErr(err); }
+    await afterSignIn();
+    if (afterCodeSetPassword) { afterCodeSetPassword = false; openSecurity("password"); }
+  };
+  $("mfaOut").onclick = async () => { if (!demo) await sb.auth.signOut(); session = null; profile = null; demoMfa.passed = false; screenEmail(); };
+}
+async function verifyMfa(code) {
+  if (demo) { if (code !== "135790") return "That code isn't right. Codes change every 30 seconds, so use the newest one."; demoMfa.passed = true; return null; }
+  const { data: f } = await sb.auth.mfa.listFactors();
+  const factor = (f?.totp || []).find((x) => x.status === "verified");
+  if (!factor) return "No authenticator is set up for this account.";
+  const { error } = await sb.auth.mfa.challengeAndVerify({ factorId: factor.id, code });
+  if (error) return "That code isn't right. Codes change every 30 seconds, so use the newest one.";
+  const { data: s } = await sb.auth.getSession(); session = s.session || session;
+  return null;
+}
+const demoMfa = { on: false, passed: false };
 
 // ---- 2. Code ---------------------------------------------------------------------
 function screenCode() {
   showAuth(`
     <button class="linkbtn back" id="backEmail">‹ Back</button>
     <h2 class="step-h">Check your email</h2>
-    <p class="step-p">We sent a sign-in email to <b>${esc(authEmail)}</b>. Tap the link in it to sign in, or type the 6-digit code here if the email shows one. It can take a minute, and sometimes lands in spam.</p>
+    <p class="step-p">We sent a 6-digit code to <b>${esc(authEmail)}</b>. Type it here, or tap the button in the email. It can take a minute, and sometimes lands in spam.</p>
     <form id="codeForm" class="auth-form">
       <input id="codeIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="••••••" required>
       <button class="btn primary big" id="codeGo" type="submit">Verify</button>
@@ -2383,11 +2446,11 @@ function screenCode() {
     const token = inp.value.trim();
     if (!/^\d{6}$/.test(token)) return authErr("Enter all 6 digits.");
     busy($("codeGo"), true, "Checking…");
-    if (demo) { profile = { ...DEMO_PROFILE, email: authEmail, full_name: "", has_business: false, business_name: "", business_preset: "general", onboarded: false }; return afterSignIn(); }
+    if (demo) { profile = afterCodeSetPassword ? { ...DEMO_PROFILE, email: authEmail } : { ...DEMO_PROFILE, email: authEmail, full_name: "", has_business: false, business_name: "", business_preset: "general", onboarded: false }; return continueSignIn(); }
     const { data, error } = await sb.auth.verifyOtp({ email: authEmail, token, type: "email" });
     if (error || !data?.session) { busy($("codeGo"), false, "Verify"); inp.value = ""; return authErr("That code isn't right, or it has expired. Check the latest email, or tap Resend for a new code."); }
     session = data.session;
-    await afterSignIn();
+    await continueSignIn();
   };
   const tick = () => {
     const b = $("resend"); if (!b) return clearInterval(resendTimer);
@@ -2451,21 +2514,20 @@ function screenName() {
 
 // ---- 4. Onboarding: business --------------------------------------------------------
 function screenBusiness() {
-  // Nothing is picked until the person taps a card (unless they already finished onboarding before)
-  const d = { has_business: onboardDraft.has_business ?? (profile.onboarded ? !!profile.has_business : null), business_name: onboardDraft.business_name ?? profile.business_name ?? "", business_preset: onboardDraft.business_preset ?? (profile.onboarded ? profile.business_preset : null) };
+  const d = { has_business: onboardDraft.has_business ?? profile.has_business ?? false, business_name: onboardDraft.business_name ?? profile.business_name ?? "", business_preset: onboardDraft.business_preset ?? profile.business_preset ?? "general" };
   showAuth(`<button class="linkbtn back" id="back">‹ Back</button>${dots(2)}
     <h2 class="step-h">Do you also run a business?</h2>
     <p class="step-p">Egom can keep business spending apart from personal spending.</p>
     <div class="choice">
-      <button type="button" data-b="0" aria-pressed="${d.has_business === false}" class="${d.has_business === false ? "on" : ""}">${icon("person")}<b>Just me</b><small>Personal spending only</small></button>
-      <button type="button" data-b="1" aria-pressed="${d.has_business === true}" class="${d.has_business === true ? "on" : ""}">${icon("briefcase")}<b>Me and my business</b><small>Two ledgers, kept apart</small></button>
+      <button type="button" data-b="0" class="${!d.has_business ? "on" : ""}">${icon("person")}<b>Just me</b><small>Personal spending only</small></button>
+      <button type="button" data-b="1" class="${d.has_business ? "on" : ""}">${icon("briefcase")}<b>Me and my business</b><small>Two ledgers, kept apart</small></button>
     </div>
     <form id="bizForm" class="auth-form">
       <div id="bizFields" class="${d.has_business ? "" : "hidden"}">
         <label for="bizIn">Business name, as on its bank account</label>
         <input id="bizIn" placeholder="e.g. Egreen Innovative Concept Ltd" value="${esc(d.business_name)}">
-        <label>What kind of business is it?</label>
-        <div class="kinds">${EX.BUSINESS_KINDS.map(([k, v]) => `<button type="button" data-p="${k}" aria-pressed="${d.business_preset === k}" class="${d.business_preset === k ? "on" : ""}">${v}</button>`).join("")}</div>
+        <label>What kind of business?</label>
+        <div class="toggle wide">${[["general", "Most businesses"], ["solar", "Solar & energy"]].map(([k, v]) => `<button type="button" data-p="${k}" class="${d.business_preset === k ? "on" : ""}">${v}</button>`).join("")}</div>
         <p class="fine">This picks the starting categories. You can change it later.</p>
       </div>
       <button class="btn primary big" type="submit" id="bizGo">Continue</button>
@@ -2474,19 +2536,15 @@ function screenBusiness() {
   $("back").onclick = screenName;
   document.querySelectorAll("[data-b]").forEach((b) => b.onclick = () => {
     d.has_business = b.dataset.b === "1";
-    document.querySelectorAll("[data-b]").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b); });
-    $("authErr").classList.add("hidden");
+    document.querySelectorAll("[data-b]").forEach((x) => x.classList.toggle("on", x === b));
     $("bizFields").classList.toggle("hidden", !d.has_business);
     if (d.has_business) $("bizIn").focus();
   });
-  document.querySelectorAll("[data-p]").forEach((b) => b.onclick = () => { d.business_preset = b.dataset.p; document.querySelectorAll("[data-p]").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b); }); });
+  document.querySelectorAll("[data-p]").forEach((b) => b.onclick = () => { d.business_preset = b.dataset.p; document.querySelectorAll("[data-p]").forEach((x) => x.classList.toggle("on", x === b)); });
   $("bizForm").onsubmit = async (e) => {
     e.preventDefault();
     d.business_name = $("bizIn").value.replace(/\s+/g, " ").trim();
-    if (d.has_business === null) return authErr("Choose Just me, or Me and my business.");
     if (d.has_business && d.business_name.length < 2) return authErr("Add your business name.");
-    if (d.has_business && !d.business_preset) return authErr("Pick the kind of business.");
-    if (!d.has_business) d.business_preset = d.business_preset || "general";
     Object.assign(onboardDraft, d);
     busy($("bizGo"), true, "Saving…");
     const err = await saveProfile({ full_name: onboardDraft.full_name, has_business: d.has_business, business_name: d.has_business ? d.business_name : null, business_preset: d.business_preset });
@@ -2578,8 +2636,8 @@ function openSettings() {
     <div class="toggle wide">${[["0", "Just me"], ["1", "Me and my business"]].map(([k, v]) => `<button type="button" data-sb="${k}" class="${(d.has_business ? "1" : "0") === k ? "on" : ""}">${v}</button>`).join("")}</div>
     <div id="sBiz" class="${d.has_business ? "" : "hidden"}">
       <label>Business name, as on its bank account</label><input id="sBizName" value="${esc(d.business_name || "")}">
-      <label for="sKind">Kind of business</label>
-      <select id="sKind">${EX.BUSINESS_KINDS.map(([k, v]) => `<option value="${k}"${(d.business_preset || "general") === k ? " selected" : ""}>${v}</option>`).join("")}</select>
+      <label>Kind of business</label>
+      <div class="toggle wide">${[["general", "Most businesses"], ["solar", "Solar & energy"]].map(([k, v]) => `<button type="button" data-sp="${k}" class="${d.business_preset === k ? "on" : ""}">${v}</button>`).join("")}</div>
     </div>
     <button class="btn primary" id="sSave" style="width:100%;margin-top:14px">Save</button>
     <label style="margin-top:20px">WhatsApp</label>
@@ -2587,7 +2645,8 @@ function openSettings() {
     <p class="fine">Egom's WhatsApp number: <b>${BOT_DISPLAY}</b></p>
     <label style="margin-top:20px">Appearance</label>
     <div class="toggle wide">${[["light", "White"], ["dark", "Night"]].map(([k, v]) => `<button type="button" data-th="${k}" class="${getTheme() === k ? "on" : ""}">${v}</button>`).join("")}</div>
-    <button class="btn" id="sApp" style="width:100%;margin-top:18px">App &amp; notifications</button>
+    <button class="btn" id="sSec" style="width:100%;margin-top:18px">Sign-in &amp; security</button>
+    <button class="btn" id="sApp" style="width:100%;margin-top:10px">App &amp; notifications</button>
     <button class="btn" id="sCats" style="width:100%;margin-top:10px">Categories</button>
     <button class="btn" id="sRefresh" style="width:100%;margin-top:10px">Refresh data</button>
     <button class="btn danger" id="sOut" style="width:100%;margin-top:18px">Sign out</button>
@@ -2595,7 +2654,7 @@ function openSettings() {
   const close = () => ($("sheetRoot").innerHTML = "");
   $("sx").onclick = close; $("sbg").onclick = (e) => { if (e.target.id === "sbg") close(); };
   document.querySelectorAll("[data-sb]").forEach((b) => b.onclick = () => { d.has_business = b.dataset.sb === "1"; document.querySelectorAll("[data-sb]").forEach((x) => x.classList.toggle("on", x === b)); $("sBiz").classList.toggle("hidden", !d.has_business); });
-  $("sKind").onchange = () => { d.business_preset = $("sKind").value; };
+  document.querySelectorAll("[data-sp]").forEach((b) => b.onclick = () => { d.business_preset = b.dataset.sp; document.querySelectorAll("[data-sp]").forEach((x) => x.classList.toggle("on", x === b)); });
   $("sSave").onclick = async () => {
     const full_name = $("sName").value.replace(/\s+/g, " ").trim(), business_name = $("sBizName").value.replace(/\s+/g, " ").trim();
     if (full_name.split(" ").length < 2) return toast("Add at least two names");
@@ -2608,6 +2667,7 @@ function openSettings() {
   $("sRefresh").onclick = () => { close(); toast("Refreshing…"); load(); };
   $("sCats").onclick = () => { close(); openCategories(); };
   $("sApp").onclick = () => { close(); openAppSheet(); };
+  $("sSec").onclick = () => { close(); openSecurity(); };
   if ($("sLink")) $("sLink").onclick = () => { close(); openLinkSheet(); };
   if ($("sUnlink")) $("sUnlink").onclick = async () => {
     if ($("sUnlink").dataset.armed !== "1") { $("sUnlink").dataset.armed = "1"; $("sUnlink").textContent = "Tap again to unlink"; return; }
@@ -2617,7 +2677,7 @@ function openSettings() {
   $("sOut").onclick = async () => {
     close();
     if (!demo) await sb.auth.signOut();
-    profile = null; session = null; rows = []; authEmail = "";
+    profile = null; session = null; rows = []; authEmail = ""; demoMfa.passed = false;
     screenEmail();
   };
 }
@@ -2637,11 +2697,11 @@ async function start() {
   registerSW();
   sb.auth.onAuthStateChange((event, s) => {
     // Someone tapped the link in the email instead of typing the code
-    if (event === "SIGNED_IN" && s && !session) { session = s; afterSignIn(); }
+    if (event === "SIGNED_IN" && s && !session) { session = s; continueSignIn(); }
     if (event === "SIGNED_OUT") { session = null; profile = null; }
   });
   const { data } = await sb.auth.getSession();
-  if (data.session) { session = data.session; return afterSignIn(); }
+  if (data.session) { session = data.session; return continueSignIn(); }
   screenEmail();
 }
 
@@ -2720,6 +2780,95 @@ async function openAppSheet() {
   });
   if ($("apTest")) $("apTest").onclick = async () => { $("apTest").disabled = true; const err = await sendTestPush(); $("apTest").disabled = false; toast(err || "Sent. It should appear in a few seconds."); };
 }
+/* ============ SIGN-IN & SECURITY: password, two-step verification ============ */
+const demoSec = { totp: false };
+async function mfaFactor() {
+  if (demo) return demoMfa.on ? { id: "demo-factor", status: "verified" } : null;
+  const { data } = await sb.auth.mfa.listFactors();
+  return (data?.totp || []).find((f) => f.status === "verified") || null;
+}
+async function openSecurity(focus) {
+  const factor = await mfaFactor().catch(() => null);
+  const hasPw = !!homePrefs().has_password;
+  const close = sheet("sec", "Sign-in &amp; security", `
+    <label>${hasPw ? "Change your password" : "Add a password"}</label>
+    <p class="fine" style="margin-top:0">${hasPw ? "You can sign in with your password or a code by email." : "Sign in straight away, without waiting for an email. You can still use a code whenever you like."}</p>
+    <form id="pwForm" class="auth-form" style="margin-top:6px">
+      <input type="email" autocomplete="username" value="${esc(profile?.email || session?.user?.email || "")}" hidden>
+      <input id="pwNew" type="password" autocomplete="new-password" placeholder="New password (at least 8 characters)" minlength="8">
+      <input id="pwNew2" type="password" autocomplete="new-password" placeholder="Type it again">
+      <button class="btn primary" id="pwSave" type="submit">${hasPw ? "Change password" : "Save password"}</button>
+    </form>
+    <label style="margin-top:22px">Two-step verification</label>
+    <div class="wa-row"><span>${factor ? `${icon("check")} On: authenticator app` : "Off"}</span><button class="btn ${factor ? "" : "primary"}" id="mfaToggle">${factor ? "Turn off" : "Turn on"}</button></div>
+    <p class="fine">${factor ? "Each time you sign in, Egom also asks for the 6-digit code from your authenticator app." : "Adds a second lock: after your password or email code, Egom asks for a 6-digit code from an app on your phone, like Google Authenticator."}</p>`);
+  if (focus === "password") { toast("Choose a new password"); setTimeout(() => $("pwNew") && $("pwNew").focus(), 50); }
+  $("pwForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const a = $("pwNew").value, b = $("pwNew2").value;
+    if (a.length < 8) return toast("Use at least 8 characters");
+    if (/^\d+$/.test(a) || /^(password|12345678|egom)/i.test(a)) return toast("Pick something harder to guess");
+    if (a !== b) return toast("The two passwords don't match");
+    $("pwSave").disabled = true;
+    if (!demo) {
+      const { error } = await sb.auth.updateUser({ password: a });
+      if (error) { $("pwSave").disabled = false; return toast(/same|different/i.test(error.message) ? "That's your current password. Choose a new one." : /reauth|aal2|assurance/i.test(error.message) ? "Sign in again, then try once more" : "Couldn't save: " + error.message); }
+    }
+    if (!hasPw) await saveProfile({ home_prefs: { ...homePrefs(), has_password: true } });
+    close(); toast(hasPw ? "Password changed" : "Password saved. Next time, sign in with it.");
+  };
+  $("mfaToggle").onclick = async () => {
+    if (factor) {
+      const btn = $("mfaToggle");
+      if (btn.dataset.armed !== "1") { btn.dataset.armed = "1"; btn.textContent = "Tap again to turn off"; return; }
+      btn.disabled = true;
+      if (demo) demoMfa.on = false;
+      else { const { error } = await sb.auth.mfa.unenroll({ factorId: factor.id }); if (error) { btn.disabled = false; return toast("Couldn't turn it off: " + error.message); } await sb.auth.refreshSession(); }
+      close(); toast("Two-step verification is off");
+    } else { close(); openMfaSetup(); }
+  };
+}
+async function openMfaSetup() {
+  let factorId = "demo-factor", qr = "", secret = "JBSWY3DPEHPK3PXP";
+  if (!demo) {
+    // clear any half-finished setup first
+    const { data: all } = await sb.auth.mfa.listFactors();
+    for (const f of (all?.all || []).filter((x) => x.status !== "verified")) await sb.auth.mfa.unenroll({ factorId: f.id });
+    const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "Egom " + new Date().toISOString().slice(0, 10), issuer: "Egom" });
+    if (error) return toast("Couldn't start: " + error.message);
+    factorId = data.id; qr = data.totp.qr_code; secret = data.totp.secret;
+  } else {
+    qr = "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#fff"/><path d="M1 1h3v3H1zM6 1h3v3H6zM1 6h3v3H1zM6 6h1v1H6zM8 8h1v1H8z" fill="#000"/></svg>`);
+  }
+  const uri = `otpauth://totp/Egom:${encodeURIComponent(profile?.email || "you")}?secret=${secret}&issuer=Egom`;
+  let done = false;
+  const close = sheet("mfa", "Turn on two-step verification", `
+    <p class="fine" style="margin-top:0"><b>1.</b> Install an authenticator app if you don't have one: Google Authenticator, Microsoft Authenticator or 1Password.</p>
+    <p class="fine"><b>2.</b> In the app, add an account and scan this code. ${isIOS() || /android/i.test(navigator.userAgent) ? `On this phone, <a href="${uri}" id="mfaOpen">tap here to add it</a> or type the key below instead.` : ""}</p>
+    <div class="qrbox"><img src="${qr}" alt="QR code for your authenticator app" width="180" height="180"></div>
+    <div class="secret-row"><code id="mfaSecret">${secret.replace(/(.{4})/g, "$1 ").trim()}</code><button class="btn" id="mfaCopy" type="button">Copy key</button></div>
+    <p class="fine"><b>3.</b> Type the 6-digit code the app shows for Egom.</p>
+    <form id="mfaSetForm" class="auth-form">
+      <input id="mfaSetIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" required>
+      <button class="btn primary" id="mfaSetGo" type="submit">Turn on</button>
+    </form>`, () => { if (!done && !demo) sb.auth.mfa.unenroll({ factorId }).catch(() => {}); });
+  $("mfaCopy").onclick = async () => { try { await navigator.clipboard.writeText(secret); toast("Key copied"); } catch { toast("Couldn't copy. Type the key instead."); } };
+  const inp = $("mfaSetIn");
+  inp.oninput = () => { inp.value = inp.value.replace(/\D/g, "").slice(0, 6); };
+  $("mfaSetForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const code = inp.value;
+    if (!/^\d{6}$/.test(code)) return toast("Enter all 6 digits");
+    $("mfaSetGo").disabled = true;
+    if (demo) { if (code !== "135790") { $("mfaSetGo").disabled = false; inp.value = ""; return toast("That code isn't right. Use the newest one from the app."); } demoMfa.on = true; demoMfa.passed = true; }
+    else {
+      const { error } = await sb.auth.mfa.challengeAndVerify({ factorId, code });
+      if (error) { $("mfaSetGo").disabled = false; inp.value = ""; return toast("That code isn't right. Use the newest one from the app."); }
+    }
+    done = true; close(); toast("Two-step verification is on");
+  };
+}
+
 // A card on Home inviting people to install, until they hide it
 function installCard() {
   if (isStandalone() || demo) return "";
