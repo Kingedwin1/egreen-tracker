@@ -471,7 +471,7 @@ html,body{background:var(--bg)}
 .auth{background:transparent}
 .app{padding:calc(env(safe-area-inset-top) + 8px) 14px calc(env(safe-area-inset-bottom) + 120px)}
 /* glass surfaces */
-.card,.day,.list,.linkcard,.wa-nudge,.choice button,.addopt,.w,.banner,.hero,.gcard,.gt,.auth-form input,.perks{background:var(--glass)!important;-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(12px) saturate(140%);box-shadow:var(--glass-edge);border:0!important}
+.card,.day,.list,.linkcard,.wa-nudge,.choice button,.addopt,.w,.banner,.hero,.gcard,.gt,.auth-form input,.perks{background:var(--glass)!important;-webkit-backdrop-filter:blur(12px) saturate(140%);backdrop-filter:blur(12px) saturate(140%);box-shadow:var(--glass-edge);border:0!important}
 .card,.day,.list,.gcard{border-radius:28px}
 .sheet{background:var(--surface)}
 .sheet select,.sheet input,.incform input,.incform select,.rin,.bud .lim,.amtwrap,.addopt #tTxt{background:var(--field)!important}
@@ -798,6 +798,14 @@ html,body{background:var(--bg)}
 .installcard .gchip{background:var(--accent);color:var(--on-lime)}
 .installcard .btn.primary{height:36px;padding:0 16px}
 
+/* onboarding choices: a clear selected state on top of the glass */
+.choice button{position:relative}
+.choice button.on{box-shadow:inset 0 0 0 2px var(--indicator),var(--glass-edge)!important}
+.choice button.on::after{content:"";position:absolute;top:12px;right:12px;width:22px;height:22px;border-radius:50%;background:#C6F432 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230E0E0E' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center/14px no-repeat}
+.kinds{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 2px}
+.kinds button{border:0;border-radius:14px;padding:12px 12px;min-height:46px;text-align:left;font-weight:600;font-size:14px;line-height:1.2;cursor:pointer;color:var(--ink);background:var(--glass,var(--surface));box-shadow:var(--glass-edge,inset 0 0 0 1px var(--line));-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.kinds button.on{box-shadow:inset 0 0 0 2px var(--indicator),var(--glass-edge,none);font-weight:700}
+
 /* ---- sign-in: password + code, security sheet ---- */
 .pw-wrap{position:relative}
 .pw-wrap input{padding-right:64px!important}
@@ -853,13 +861,36 @@ window.EX = (function () {
 // No AI, no paid services.
 
                                             
-                                         
+                             // "general", "solar", or one of BUSINESS_KINDS
 
 const PERSONAL_CATEGORIES = ["Food & Groceries", "Eating Out", "Transport & Fuel", "Airtime & Data", "Bills & Utilities", "Rent & Housing", "Family & Support", "Giving & Church", "Shopping & Personal Care", "Health", "Entertainment", "Subscriptions", "Savings & Investment", "Bank Charges", "Other"];
 const BUSINESS_CATEGORIES                           = {
   general: ["Stock & Inventory", "Materials & Supplies", "Staff Salaries", "Contractors & Labour", "Logistics & Delivery", "Vehicle & Fuel", "Rent & Office", "Utilities & Internet", "Marketing & Ads", "Software & Subscriptions", "Tools & Equipment", "Travel", "Professional Fees", "Taxes & Compliance", "Bank Charges", "Customer Refunds", "Other"],
   solar: ["Solar Equipment", "Installation Materials", "Installer & Labour Payouts", "Logistics & Delivery", "Vehicle & Fuel", "Staff Salaries", "Marketing & Ads", "Software & Subscriptions", "Office Rent & Upkeep", "Utilities & Internet", "Tools & Equipment", "Travel & Site Visits", "Professional Fees", "Taxes & Compliance", "Bank Charges", "Customer Refunds", "Other"],
 };
+// Kinds of business people can pick. Each kind adds its own categories (with keywords)
+// in front of the general business list. "solar" and "general" keep their own lists above.
+const BUSINESS_KINDS                     = [
+  ["retail", "Shop & retail"], ["food", "Food & restaurant"], ["fashion", "Fashion & beauty"],
+  ["services", "Professional services"], ["tech", "Tech & online"], ["transport", "Transport & logistics"],
+  ["agric", "Farming & agro"], ["building", "Building & real estate"], ["health", "Health & pharmacy"],
+  ["education", "School & training"], ["events", "Events & media"], ["solar", "Solar & energy"],
+  ["general", "Something else"],
+];
+const SECTORS                                                                        = {
+  retail: { cats: { "Packaging": ["packaging", "nylon", "nylons", "bags", "cartons", "boxes", "labels", "stickers"], "POS & Card Charges": ["pos", "pos charge", "card charge", "terminal", "settlement fee"] }, signals: ["shop", "store", "stock", "customer", "pos", "goods"] },
+  food: { cats: { "Ingredients & Food Stock": ["ingredients", "foodstuff", "rice", "beans", "groundnut oil", "palm oil", "pepper", "tomatoes", "onions", "meat", "chicken", "fish", "flour", "sugar", "spices", "market"], "Gas & Cooking Fuel": ["gas", "cooking gas", "lpg", "gas refill", "charcoal", "firewood"], "Packaging": ["packaging", "takeaway", "take away", "pack", "nylon", "foil", "plates", "cups"] }, signals: ["restaurant", "kitchen", "catering", "food", "order", "customer"] },
+  fashion: { cats: { "Fabrics & Materials": ["fabric", "fabrics", "ankara", "lace", "aso oke", "thread", "zip", "zips", "buttons", "lining", "material"], "Beauty Supplies": ["hair", "attachment", "wig", "braids", "relaxer", "nail", "nails", "lashes", "makeup", "cosmetics", "salon products"] }, signals: ["tailor", "salon", "boutique", "client", "customer", "fabric"] },
+  services: { cats: { "Client Entertainment": ["client lunch", "client dinner", "entertainment", "refreshments"], "Training & Courses": ["course", "courses", "training", "certification", "workshop", "conference", "seminar"] }, signals: ["client", "consulting", "consultancy", "project", "invoice", "retainer"] },
+  tech: { cats: { "Hosting & Cloud": ["hosting", "server", "aws", "google cloud", "azure", "vercel", "supabase", "cloudflare", "domain", "digitalocean", "firebase"], "Devices & Gadgets": ["laptop", "phone", "iphone", "macbook", "tablet", "monitor", "charger", "gadget", "gadgets"] }, signals: ["app", "software", "client", "subscription", "hosting", "developer"] },
+  transport: { cats: { "Vehicle Repairs": ["mechanic", "repair", "repairs", "spare parts", "servicing", "tyre", "tyres", "vulcanizer", "brake", "engine"], "Drivers & Riders": ["driver", "drivers", "rider", "riders", "dispatch rider"], "Tolls & Levies": ["toll", "levy", "levies", "union", "park ticket", "agbero", "lcc", "permit"] }, signals: ["trip", "delivery", "dispatch", "waybill", "rider", "driver", "haulage"] },
+  agric: { cats: { "Seeds & Feed": ["seed", "seeds", "seedlings", "feed", "feeds", "chicks", "fingerlings", "layers mash", "grower", "starter"], "Fertiliser & Chemicals": ["fertiliser", "fertilizer", "npk", "urea", "herbicide", "pesticide", "insecticide", "chemicals"], "Animal Health": ["vet", "veterinary", "vaccine", "vaccines", "vitamins", "medication"], "Farm Labour": ["farm hand", "farmhands", "labourers", "weeding", "harvest", "clearing"] }, signals: ["farm", "poultry", "crops", "birds", "pond", "harvest", "feed", "eggs"] },
+  building: { cats: { "Building Materials": ["cement", "blocks", "sand", "granite", "iron rod", "rods", "roofing", "tiles", "paint", "plumbing", "pop", "timber", "wood"], "Site Labour": ["mason", "bricklayer", "carpenter", "plumber", "labourer", "workmanship", "iron bender", "tiler", "site work"], "Equipment Hire": ["hire", "rental", "scaffold", "scaffolding", "mixer", "excavator", "tipper"] }, signals: ["site", "project", "client", "building", "construction", "property", "tenant"] },
+  health: { cats: { "Drugs & Medical Supplies": ["drugs", "medicine", "medicines", "syringes", "gloves", "consumables", "medical supplies", "test kits"], "Lab & Medical Equipment": ["lab", "laboratory", "reagents", "bp monitor", "glucometer", "medical equipment"] }, signals: ["patient", "patients", "clinic", "pharmacy", "hospital", "drugs"] },
+  education: { cats: { "Teaching Materials": ["books", "textbooks", "chalk", "markers", "teaching aids", "uniforms", "stationery"], "Exam & Registration Fees": ["waec", "neco", "jamb", "exam fee", "exam fees", "registration", "accreditation"] }, signals: ["school", "student", "students", "pupils", "parents", "tuition", "fees"] },
+  events: { cats: { "Equipment Hire": ["hire", "rental", "sound", "lights", "screen", "generator hire", "camera hire"], "Crew & Freelancers": ["crew", "freelancer", "freelance", "photographer", "videographer", "editor", "dj", "mc", "usher", "ushers", "sound engineer"], "Venue & Decor": ["venue", "hall", "decor", "decoration", "canopy", "chairs", "tables", "flowers", "stage"] }, signals: ["event", "client", "booking", "show", "shoot", "production", "wedding"] },
+};
+for (const [k, s] of Object.entries(SECTORS)) BUSINESS_CATEGORIES[k] = [...Object.keys(s.cats), ...BUSINESS_CATEGORIES.general.filter((c) => !(c in s.cats))];
 // Money in gets its own short list, the same for personal and business
 const INCOME_CATEGORIES = ["Salary", "Sales & Customer Payments", "Gifts & Support", "Refunds & Reversals", "Loans & Investment", "Other Income"];
 const INCOME_KEYWORDS                           = {
@@ -938,6 +969,7 @@ const KEYWORDS                                                        = {
     "Bank Charges": ["bank charge", "charges", "sms alert", "stamp duty", "maintenance fee", "commission", "transfer fee"],
   },
 };
+for (const [k, sec] of Object.entries(SECTORS)) KEYWORDS[k] = { ...sec.cats, ...KEYWORDS.general };
 
 const BANKS = ["OPay", "Moniepoint", "Kuda", "PalmPay", "GTBank", "Guaranty Trust", "Access", "Zenith", "UBA", "First Bank", "FirstBank", "Fidelity", "FCMB", "Sterling", "Wema", "ALAT", "Union Bank", "Stanbic", "Ecobank", "Polaris", "Providus", "Keystone", "Jaiz", "Carbon", "Paystack", "Flutterwave", "Paga", "Fairmoney", "VFD", "Globus", "Titan", "Lotus", "Taj", "Parallex", "Unity Bank", "Heritage", "Standard Chartered", "Citibank", "Moremonee", "Rubies"];
 
@@ -1063,6 +1095,7 @@ const BUSINESS_SIGNALS                           = {
   general: ["client", "customer", "supplier", "stock", "inventory", "wholesale", "logistics", "salary", "salaries", "staff", "office", "shop", "materials", "waybill", "invoice", "contractor"],
   solar: ["solar", "panel", "panels", "inverter", "inverters", "battery", "batteries", "installer", "installation", "client", "customer", "site", "logistics", "salary", "salaries", "deye", "lithium", "office", "materials", "waybill"],
 };
+for (const [k, sec] of Object.entries(SECTORS)) BUSINESS_SIGNALS[k] = [...new Set([...BUSINESS_SIGNALS.general, ...sec.signals])];
 
 function guessSpace(text        , preset        , businessName = "")               {
   const t = norm(text);
@@ -1359,7 +1392,7 @@ async function readPdf(pdfjs, data, password) {
   return { pages, text, numPages: doc.numPages };
 }
 
-return { parseReceiptText, parseManual, spaceFromOwner, categorize, categoriesFor, listFor, incomeCategory, INCOME_CATEGORIES, PERSONAL_CATEGORIES, BUSINESS_CATEGORIES, norm, parseStatementPages, readPdf };
+return { parseReceiptText, parseManual, spaceFromOwner, categorize, categoriesFor, listFor, incomeCategory, INCOME_CATEGORIES, PERSONAL_CATEGORIES, BUSINESS_CATEGORIES, BUSINESS_KINDS, norm, parseStatementPages, readPdf };
 })();
 </script>
 <script type="module">
@@ -1380,7 +1413,7 @@ const ICON = {
 // pastel tile colours: [tile background, icon circle]
 const SOLIDS = ["#16813A","#2F6FD6","#D9822B","#7C4DCC","#C8463C","#1A9C9C","#B8860B","#C2477F","#4A7A2C","#5B6B8C","#8E5B3A","#3E7A00"];
 const PASTELS = SOLIDS.map((c) => [c + "1F", c]);
-const ALL_CATS = [...new Set([...EX.PERSONAL_CATEGORIES, ...EX.BUSINESS_CATEGORIES.solar, ...EX.BUSINESS_CATEGORIES.general])];
+const ALL_CATS = [...new Set([...EX.PERSONAL_CATEGORIES, ...EX.BUSINESS_CATEGORIES.solar, ...EX.BUSINESS_CATEGORIES.general, ...Object.values(EX.BUSINESS_CATEGORIES).flat()])];
 const HUES = {
   light: ["#A35F00", "#2753C9", "#0F7262", "#6A3FD1", "#B4234A", "#4A7300"],
   dark: ["#FFC266", "#8FB0FF", "#5FD3BE", "#B9A0FF", "#FF8FA8", "#B6E06A"],
@@ -1446,7 +1479,12 @@ const CAT_ICON = {
   "Giving & Church": "heart", "Gifts & Support": "heart", "Shopping & Personal Care": "bag", "Health": "health", "Entertainment": "play",
   "Subscriptions": "repeat", "Software & Subscriptions": "laptop", "Savings & Investment": "trend", "Loans & Investment": "trend",
   "Bank Charges": "bank", "Taxes & Compliance": "scale", "Professional Fees": "scale", "Marketing & Ads": "megaphone", "Tools & Equipment": "tool",
-  "Customer Refunds": "undo", "Refunds & Reversals": "undo", "Salary": "briefcase", "Sales & Customer Payments": "receipt", "Other Income": "in", "Other": "dot",
+  "Customer Refunds": "undo", "Refunds & Reversals": "undo",
+  "Packaging": "box", "POS & Card Charges": "card", "Ingredients & Food Stock": "cart", "Gas & Cooking Fuel": "bolt", "Fabrics & Materials": "bag", "Beauty Supplies": "bag",
+  "Client Entertainment": "food", "Training & Courses": "chart", "Hosting & Cloud": "laptop", "Devices & Gadgets": "laptop", "Vehicle Repairs": "tool", "Drivers & Riders": "people",
+  "Tolls & Levies": "scale", "Seeds & Feed": "box", "Fertiliser & Chemicals": "box", "Animal Health": "health", "Farm Labour": "people", "Building Materials": "box",
+  "Site Labour": "people", "Equipment Hire": "tool", "Drugs & Medical Supplies": "health", "Lab & Medical Equipment": "health", "Teaching Materials": "box",
+  "Exam & Registration Fees": "scale", "Crew & Freelancers": "people", "Venue & Decor": "home", "Salary": "briefcase", "Sales & Customer Payments": "receipt", "Other Income": "in", "Other": "dot",
 };
 const catIcon = (c) => icon((profile?.home_prefs?.cat_icons || {})[c] || CAT_ICON[c] || "dot");
 // Logo: the two-bar symbol (lime = money in, white outline = money out) + the egóm wordmark
@@ -2514,20 +2552,21 @@ function screenName() {
 
 // ---- 4. Onboarding: business --------------------------------------------------------
 function screenBusiness() {
-  const d = { has_business: onboardDraft.has_business ?? profile.has_business ?? false, business_name: onboardDraft.business_name ?? profile.business_name ?? "", business_preset: onboardDraft.business_preset ?? profile.business_preset ?? "general" };
+  // Nothing is picked until the person taps a card (unless they already finished onboarding before)
+  const d = { has_business: onboardDraft.has_business ?? (profile.onboarded ? !!profile.has_business : null), business_name: onboardDraft.business_name ?? profile.business_name ?? "", business_preset: onboardDraft.business_preset ?? (profile.onboarded ? profile.business_preset : null) };
   showAuth(`<button class="linkbtn back" id="back">‹ Back</button>${dots(2)}
     <h2 class="step-h">Do you also run a business?</h2>
     <p class="step-p">Egom can keep business spending apart from personal spending.</p>
     <div class="choice">
-      <button type="button" data-b="0" class="${!d.has_business ? "on" : ""}">${icon("person")}<b>Just me</b><small>Personal spending only</small></button>
-      <button type="button" data-b="1" class="${d.has_business ? "on" : ""}">${icon("briefcase")}<b>Me and my business</b><small>Two ledgers, kept apart</small></button>
+      <button type="button" data-b="0" aria-pressed="${d.has_business === false}" class="${d.has_business === false ? "on" : ""}">${icon("person")}<b>Just me</b><small>Personal spending only</small></button>
+      <button type="button" data-b="1" aria-pressed="${d.has_business === true}" class="${d.has_business === true ? "on" : ""}">${icon("briefcase")}<b>Me and my business</b><small>Two ledgers, kept apart</small></button>
     </div>
     <form id="bizForm" class="auth-form">
       <div id="bizFields" class="${d.has_business ? "" : "hidden"}">
         <label for="bizIn">Business name, as on its bank account</label>
         <input id="bizIn" placeholder="e.g. Egreen Innovative Concept Ltd" value="${esc(d.business_name)}">
-        <label>What kind of business?</label>
-        <div class="toggle wide">${[["general", "Most businesses"], ["solar", "Solar & energy"]].map(([k, v]) => `<button type="button" data-p="${k}" class="${d.business_preset === k ? "on" : ""}">${v}</button>`).join("")}</div>
+        <label>What kind of business is it?</label>
+        <div class="kinds">${EX.BUSINESS_KINDS.map(([k, v]) => `<button type="button" data-p="${k}" aria-pressed="${d.business_preset === k}" class="${d.business_preset === k ? "on" : ""}">${v}</button>`).join("")}</div>
         <p class="fine">This picks the starting categories. You can change it later.</p>
       </div>
       <button class="btn primary big" type="submit" id="bizGo">Continue</button>
@@ -2536,15 +2575,19 @@ function screenBusiness() {
   $("back").onclick = screenName;
   document.querySelectorAll("[data-b]").forEach((b) => b.onclick = () => {
     d.has_business = b.dataset.b === "1";
-    document.querySelectorAll("[data-b]").forEach((x) => x.classList.toggle("on", x === b));
+    document.querySelectorAll("[data-b]").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b); });
+    $("authErr").classList.add("hidden");
     $("bizFields").classList.toggle("hidden", !d.has_business);
     if (d.has_business) $("bizIn").focus();
   });
-  document.querySelectorAll("[data-p]").forEach((b) => b.onclick = () => { d.business_preset = b.dataset.p; document.querySelectorAll("[data-p]").forEach((x) => x.classList.toggle("on", x === b)); });
+  document.querySelectorAll("[data-p]").forEach((b) => b.onclick = () => { d.business_preset = b.dataset.p; document.querySelectorAll("[data-p]").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b); }); });
   $("bizForm").onsubmit = async (e) => {
     e.preventDefault();
     d.business_name = $("bizIn").value.replace(/\s+/g, " ").trim();
+    if (d.has_business === null) return authErr("Choose Just me, or Me and my business.");
     if (d.has_business && d.business_name.length < 2) return authErr("Add your business name.");
+    if (d.has_business && !d.business_preset) return authErr("Pick the kind of business.");
+    if (!d.has_business) d.business_preset = d.business_preset || "general";
     Object.assign(onboardDraft, d);
     busy($("bizGo"), true, "Saving…");
     const err = await saveProfile({ full_name: onboardDraft.full_name, has_business: d.has_business, business_name: d.has_business ? d.business_name : null, business_preset: d.business_preset });
@@ -2636,8 +2679,8 @@ function openSettings() {
     <div class="toggle wide">${[["0", "Just me"], ["1", "Me and my business"]].map(([k, v]) => `<button type="button" data-sb="${k}" class="${(d.has_business ? "1" : "0") === k ? "on" : ""}">${v}</button>`).join("")}</div>
     <div id="sBiz" class="${d.has_business ? "" : "hidden"}">
       <label>Business name, as on its bank account</label><input id="sBizName" value="${esc(d.business_name || "")}">
-      <label>Kind of business</label>
-      <div class="toggle wide">${[["general", "Most businesses"], ["solar", "Solar & energy"]].map(([k, v]) => `<button type="button" data-sp="${k}" class="${d.business_preset === k ? "on" : ""}">${v}</button>`).join("")}</div>
+      <label for="sKind">Kind of business</label>
+      <select id="sKind">${EX.BUSINESS_KINDS.map(([k, v]) => `<option value="${k}"${(d.business_preset || "general") === k ? " selected" : ""}>${v}</option>`).join("")}</select>
     </div>
     <button class="btn primary" id="sSave" style="width:100%;margin-top:14px">Save</button>
     <label style="margin-top:20px">WhatsApp</label>
@@ -2654,7 +2697,7 @@ function openSettings() {
   const close = () => ($("sheetRoot").innerHTML = "");
   $("sx").onclick = close; $("sbg").onclick = (e) => { if (e.target.id === "sbg") close(); };
   document.querySelectorAll("[data-sb]").forEach((b) => b.onclick = () => { d.has_business = b.dataset.sb === "1"; document.querySelectorAll("[data-sb]").forEach((x) => x.classList.toggle("on", x === b)); $("sBiz").classList.toggle("hidden", !d.has_business); });
-  document.querySelectorAll("[data-sp]").forEach((b) => b.onclick = () => { d.business_preset = b.dataset.sp; document.querySelectorAll("[data-sp]").forEach((x) => x.classList.toggle("on", x === b)); });
+  $("sKind").onchange = () => { d.business_preset = $("sKind").value; };
   $("sSave").onclick = async () => {
     const full_name = $("sName").value.replace(/\s+/g, " ").trim(), business_name = $("sBizName").value.replace(/\s+/g, " ").trim();
     if (full_name.split(" ").length < 2) return toast("Add at least two names");
