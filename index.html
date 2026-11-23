@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EBE6">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Egom">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem("egom-theme")||"light"}catch(e){document.documentElement.dataset.theme="light"}</script>
 <meta name="description" content="Egom keeps track of your money from your receipts. Forward receipts on WhatsApp or upload them, and see where your money goes.">
 <title>Egom · Money in. Money out. Clear.</title>
@@ -777,6 +783,20 @@ html,body{background:var(--bg)}
   .gspark svg{height:64px}
 }
 @media (max-width:1023px){ .gspark svg{height:36px} .g-hero .gl{margin-bottom:4px} .gh-io .gl{font-size:10px} }
+
+/* app & notifications */
+.nlist{display:flex;flex-direction:column;margin-top:6px}
+.nrow{display:flex!important;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);margin:0!important;font-weight:400!important;cursor:pointer}
+.nrow span{display:flex;flex-direction:column;gap:2px}
+.nrow b{font-size:15px;font-weight:600;color:var(--ink)}
+.nrow small{font-size:12px;color:var(--muted)}
+.nrow input{width:22px;height:22px;accent-color:#0E0E0E;flex:0 0 auto}
+.installcard{display:flex;align-items:center;gap:12px;padding:14px 14px 14px 16px}
+.installcard>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.installcard b{font-size:14px;font-weight:600}
+.installcard small{font-size:12px;color:var(--muted)}
+.installcard .gchip{background:var(--accent);color:var(--on-lime)}
+.installcard .btn.primary{height:36px;padding:0 16px}
 </style>
 </head>
 <body><div id="blobs" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i></div>
@@ -1612,13 +1632,14 @@ function renderHome() {
       ${payRows.length ? payRows.map(([p, v]) => `<div class="grow"><span class="gchip sm in">${icon("in")}</span><span>${esc(p)}</span><b class="inc">+${money(v)}</b></div>`).join("")
         : `<p class="gempty">No money in recorded for this month yet.</p>`}
     </section>`;
-  $("view").innerHTML = `${hero}
+  $("view").innerHTML = `${installCard()}${hero}
     <div class="ghead"><h3>Widgets</h3><button type="button" class="linkbtn" id="wEdit">Edit</button></div>
     ${!cats.length && !pins ? `<div class="gcard"><p class="gempty">Nothing spent in ${monthTitle(ym).toLowerCase()} yet. Forward a receipt to Egom on WhatsApp, or tap the + button.</p></div>` : ""}
     <div class="gtiles">${tiles}</div>
     <div class="gpair">${rest}${money_in}</div>`;
   $("view").querySelectorAll("[data-cat]").forEach((b) => b.onclick = () => { tab = "budget"; catSel = b.dataset.cat; saveUi(); render(); scrollTo(0, 0); });
   if ($("incAdd")) $("incAdd").onclick = () => openIncome();
+  wireInstallCard();
   $("wAdd").onclick = () => openWidgetPicker(tileCats);
   $("wEdit").onclick = () => openWidgetEditor(tileCats);
   // long-press a tile to edit just that widget
@@ -2333,7 +2354,7 @@ function screenCode() {
   const tick = () => {
     const b = $("resend"); if (!b) return clearInterval(resendTimer);
     const left = Math.ceil((resendAt - Date.now()) / 1000);
-    b.disabled = left > 0; b.textContent = left > 0 ? `Resend code in ${left}s` : "Resend code";
+    b.disabled = left > 0; b.textContent = left > 0 ? `Resend email in ${left}s` : "Resend email";
   };
   clearInterval(resendTimer); resendTimer = setInterval(tick, 1000); tick();
   $("resend").onclick = async () => { const err = await sendCode(); authErr(err || ""); if (!err) toast("New code sent"); tick(); };
@@ -2353,7 +2374,15 @@ async function afterSignIn() {
   if (!profile.onboarded) return screenName();
   enterApp();
 }
-function enterApp() { showApp(); load(); }
+function enterApp() { deepLink(); showApp(); load(); }
+// Links from notifications and the home-screen shortcut: /?tab=budget, /?add=1
+function deepLink() {
+  const q = new URLSearchParams(location.search);
+  const t = q.get("tab");
+  if (t && ["home", "accounts", "tx", "budget"].includes(t)) { tab = t; catSel = null; }
+  if (q.get("add")) setTimeout(() => { try { openAdd(); } catch {} }, 600);
+  if (t || q.get("add") || q.get("source")) history.replaceState(null, "", location.pathname);
+}
 
 async function saveProfile(patch) {
   Object.assign(profile, patch);
@@ -2515,7 +2544,8 @@ function openSettings() {
     <p class="fine">Egom's WhatsApp number: <b>${BOT_DISPLAY}</b></p>
     <label style="margin-top:20px">Appearance</label>
     <div class="toggle wide">${[["light", "White"], ["dark", "Night"]].map(([k, v]) => `<button type="button" data-th="${k}" class="${getTheme() === k ? "on" : ""}">${v}</button>`).join("")}</div>
-    <button class="btn" id="sCats" style="width:100%;margin-top:18px">Categories</button>
+    <button class="btn" id="sApp" style="width:100%;margin-top:18px">App &amp; notifications</button>
+    <button class="btn" id="sCats" style="width:100%;margin-top:10px">Categories</button>
     <button class="btn" id="sRefresh" style="width:100%;margin-top:10px">Refresh data</button>
     <button class="btn danger" id="sOut" style="width:100%;margin-top:18px">Sign out</button>
   </div></div>`;
@@ -2534,6 +2564,7 @@ function openSettings() {
   document.querySelectorAll("[data-th]").forEach((b) => b.onclick = () => { setTheme(b.dataset.th); document.querySelectorAll("[data-th]").forEach((x) => x.classList.toggle("on", x === b)); render(); });
   $("sRefresh").onclick = () => { close(); toast("Refreshing…"); load(); };
   $("sCats").onclick = () => { close(); openCategories(); };
+  $("sApp").onclick = () => { close(); openAppSheet(); };
   if ($("sLink")) $("sLink").onclick = () => { close(); openLinkSheet(); };
   if ($("sUnlink")) $("sUnlink").onclick = async () => {
     if ($("sUnlink").dataset.armed !== "1") { $("sUnlink").dataset.armed = "1"; $("sUnlink").textContent = "Tap again to unlink"; return; }
@@ -2560,6 +2591,7 @@ async function start() {
     return screenEmail();
   }
   sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, detectSessionInUrl: true } });
+  registerSW();
   sb.auth.onAuthStateChange((event, s) => {
     // Someone tapped the link in the email instead of typing the code
     if (event === "SIGNED_IN" && s && !session) { session = s; afterSignIn(); }
@@ -2568,6 +2600,94 @@ async function start() {
   const { data } = await sb.auth.getSession();
   if (data.session) { session = data.session; return afterSignIn(); }
   screenEmail();
+}
+
+/* ============ APP: add to home screen, offline, notifications ============ */
+const VAPID_PUBLIC = "BCfpS1aXNf-zyEIhn0FfbR1fQ0mI-rp6x3VtxhKTTJznkol6z4Lcdn3_rNSen48xifoZohzy9TMAZrQfg2oQoj4";
+const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const canPush = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+let installEvt = null, swReg = null;
+addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; if (tab === "home" && session) render(); });
+addEventListener("appinstalled", () => { installEvt = null; toast("Egom is on your home screen"); render(); });
+async function registerSW() {
+  if (!("serviceWorker" in navigator) || demo) return null;
+  if (location.protocol !== "https:" && !/^(localhost|127\.)/.test(location.hostname)) return null;
+  try { swReg = await navigator.serviceWorker.register("/sw.js"); } catch (e) { console.warn("service worker", e); }
+  return swReg;
+}
+const b64uToBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+async function currentPushSub() {
+  if (!canPush()) return null;
+  const reg = swReg || await navigator.serviceWorker.getRegistration();
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+async function turnOnPush() {
+  if (demo) return "In the preview, notifications can't be turned on. They work on egom.ng.";
+  if (!canPush()) return isIOS() && !isStandalone() ? "On iPhone, add Egom to your Home Screen first, then turn notifications on from the app." : "This browser can't show notifications.";
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") return "Notifications are blocked. Allow them for egom.ng in your phone's settings, then try again.";
+  const reg = swReg || await registerSW();
+  if (!reg) return "Couldn't set up notifications on this device.";
+  await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(VAPID_PUBLIC) });
+  const j = sub.toJSON();
+  const { error } = await sb.rpc("save_push_subscription", { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_ua: navigator.userAgent });
+  return error ? "Couldn't save this device: " + error.message : null;
+}
+async function turnOffPush() {
+  const sub = await currentPushSub();
+  if (sub) { if (!demo) await sb.rpc("delete_push_subscription", { p_endpoint: sub.endpoint }); await sub.unsubscribe().catch(() => {}); }
+}
+async function sendTestPush() {
+  const { data, error } = await sb.functions.invoke("egom-notify", { body: { test: true } });
+  if (error) return "Couldn't send a test: " + error.message;
+  return data && data.sent ? null : (data && data.error) || "No device got it. Turn notifications off and on again.";
+}
+const notifyPrefs = () => { const n = homePrefs().notify || {}; return { budget: n.budget !== false, monthly: n.monthly !== false, daily: n.daily === true }; };
+function installHTML() {
+  if (isStandalone()) return `<p class="fine">Egom is installed on this device.</p>`;
+  if (installEvt) return `<button class="btn primary" id="sInstall" style="width:100%">${icon("plus")} Add Egom to home screen</button>`;
+  if (isIOS()) return `<p class="fine">In <b>Safari</b>, tap the <b>Share</b> button, then <b>Add to Home Screen</b>. Egom then opens like an app, and notifications can be turned on.</p>`;
+  return `<p class="fine">In Chrome, open the <b>⋮</b> menu and tap <b>Install app</b> or <b>Add to Home screen</b>.</p>`;
+}
+async function openAppSheet() {
+  const on = !!(await currentPushSub().catch(() => null)) && "Notification" in window && Notification.permission === "granted";
+  const pr = notifyPrefs();
+  const close = sheet("ap", "App &amp; notifications", `
+    <label>On your phone</label>${installHTML()}
+    <label style="margin-top:18px">Notifications</label>
+    <div class="wa-row"><span>${on ? `${icon("check")} On for this device` : "Off on this device"}</span><button class="btn ${on ? "" : "primary"}" id="apPush">${on ? "Turn off" : "Turn on"}</button></div>
+    ${isIOS() && !isStandalone() ? `<p class="fine">On iPhone, notifications work once Egom is on your Home Screen (iOS 16.4 or newer).</p>` : ""}
+    <div class="nlist">
+      ${[["budget", "Budget alerts", "When a category reaches 80% of its budget, and when it goes over"], ["monthly", "Monthly summary", "On the 1st, last month's money in and out"], ["daily", "Evening reminder", "At 8pm, if nothing was recorded that day"]].map(([k, t, d]) => `
+      <label class="nrow"><span><b>${t}</b><small>${d}</small></span><input type="checkbox" data-np="${k}" ${pr[k] ? "checked" : ""}></label>`).join("")}
+    </div>
+    ${on ? `<button class="btn" id="apTest" style="width:100%;margin-top:12px">Send a test notification</button>` : ""}`);
+  if ($("sInstall")) $("sInstall").onclick = async () => { installEvt.prompt(); const r = await installEvt.userChoice; installEvt = null; close(); if (r.outcome === "accepted") toast("Added to your home screen"); };
+  $("apPush").onclick = async () => {
+    $("apPush").disabled = true;
+    if (on) { await turnOffPush(); toast("Notifications off on this device"); }
+    else { const err = await turnOnPush(); if (err) { $("apPush").disabled = false; return toast(err); } toast("Notifications on"); }
+    openAppSheet();
+  };
+  $("sheetRoot").querySelectorAll("[data-np]").forEach((c) => c.onchange = async () => {
+    const hp = homePrefs(); await saveHomePrefs({ ...hp, notify: { ...notifyPrefs(), [c.dataset.np]: c.checked } });
+  });
+  if ($("apTest")) $("apTest").onclick = async () => { $("apTest").disabled = true; const err = await sendTestPush(); $("apTest").disabled = false; toast(err || "Sent. It should appear in a few seconds."); };
+}
+// A card on Home inviting people to install, until they hide it
+function installCard() {
+  if (isStandalone() || demo) return "";
+  try { if (localStorage.getItem("egom-install-hide")) return ""; } catch {}
+  if (!installEvt && !isIOS()) return "";
+  return `<section class="gcard installcard"><span class="gchip">${icon("plus")}</span><div><b>Put Egom on your home screen</b><small>${installEvt ? "Opens like an app, with notifications." : "In Safari: Share, then Add to Home Screen."}</small></div>
+    ${installEvt ? `<button class="btn primary" id="icGo">Add</button>` : ""}<button class="btn ico-btn" id="icX" aria-label="Hide">${icon("close")}</button></section>`;
+}
+function wireInstallCard() {
+  if ($("icGo")) $("icGo").onclick = async () => { installEvt.prompt(); await installEvt.userChoice; installEvt = null; render(); };
+  if ($("icX")) $("icX").onclick = () => { try { localStorage.setItem("egom-install-hide", "1"); } catch {} render(); };
 }
 
 /* ============ ADD: screenshots, statements, typed entries ============ */
