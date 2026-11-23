@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Egom">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script>try{document.documentElement.dataset.theme=localStorage.getItem("egom-theme")||"light"}catch(e){document.documentElement.dataset.theme="light"}</script>
+<script>(function(){var a="auto";try{a=localStorage.getItem("egom-appearance")||"auto"}catch(e){}var d=a==="auto"?(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):a;document.documentElement.dataset.theme=d;})()</script>
 <meta name="description" content="Egom keeps track of your money from your receipts. Forward receipts on WhatsApp or upload them, and see where your money goes.">
 <title>Egom · Money in. Money out. Clear.</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 112 112'%3E%3Crect width='112' height='112' rx='26' fill='%230E0E0E'/%3E%3Crect x='76' y='14' width='9' height='22' rx='4.5' fill='%23C6F432' transform='rotate(30 80.5 25)'/%3E%3Crect x='22' y='42' width='56' height='22' rx='11' fill='%23C6F432'/%3E%3Crect x='38' y='72' width='52' height='18' rx='9' fill='none' stroke='%23FFFFFF' stroke-width='4'/%3E%3C/svg%3E">
@@ -1493,14 +1493,23 @@ const logoHTML = (size = 26) => `<span class="lockup" style="font-size:${size}px
 // Monochrome steps for charts, told apart by lightness (lime stays for money in)
 const RANK = ["var(--r1)", "var(--r2)", "var(--r3)", "var(--r4)", "var(--r5)"];
 
-/* ============ theme: white (default) or night ============ */
+/* ============ theme: follows the phone (Auto) unless the person picks White or Night ============ */
+const darkQuery = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
 const getTheme = () => document.documentElement.dataset.theme || "light";
-function setTheme(t) {
+const getAppearance = () => { try { return localStorage.getItem("egom-appearance") || "auto"; } catch (e) { return "auto"; } };
+function applyTheme() {
+  const a = getAppearance();
+  const t = a === "auto" ? (darkQuery && darkQuery.matches ? "dark" : "light") : a;
   document.documentElement.dataset.theme = t;
-  try { localStorage.setItem("egom-theme", t); } catch (e) {}
   const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t === "light" ? "#E8EBE6" : "#060708";
+  return t;
 }
-setTheme(getTheme());
+function setAppearance(a) { try { localStorage.setItem("egom-appearance", a); } catch (e) {} applyTheme(); }
+applyTheme();
+if (darkQuery) {
+  const onChange = () => { if (getAppearance() === "auto") { applyTheme(); if (typeof render === "function" && $("app") && !$("app").classList.contains("hidden")) render(); } };
+  darkQuery.addEventListener ? darkQuery.addEventListener("change", onChange) : darkQuery.addListener(onChange);
+}
 
 /* ============ state ============ */
 let sb = null, demo = false, profile = null, session = null, rows = [], budgets = {}; // budgets: {"space|category": limit}
@@ -2687,7 +2696,8 @@ function openSettings() {
     <div class="wa-row">${profile.whatsapp ? `<span>${icon("check")} ${esc(fmtPhone(profile.whatsapp))}</span><button class="btn" id="sUnlink">Unlink</button>` : `<span class="fine">Not linked yet</span><button class="btn primary" id="sLink">Link WhatsApp</button>`}</div>
     <p class="fine">Egom's WhatsApp number: <b>${BOT_DISPLAY}</b></p>
     <label style="margin-top:20px">Appearance</label>
-    <div class="toggle wide">${[["light", "White"], ["dark", "Night"]].map(([k, v]) => `<button type="button" data-th="${k}" class="${getTheme() === k ? "on" : ""}">${v}</button>`).join("")}</div>
+    <div class="toggle wide">${[["auto", "Auto"], ["light", "White"], ["dark", "Night"]].map(([k, v]) => `<button type="button" data-th="${k}" class="${getAppearance() === k ? "on" : ""}">${v}</button>`).join("")}</div>
+    <p class="fine" style="margin-top:6px">Auto follows your phone's light or dark mode.</p>
     <button class="btn" id="sSec" style="width:100%;margin-top:18px">Sign-in &amp; security</button>
     <button class="btn" id="sApp" style="width:100%;margin-top:10px">App &amp; notifications</button>
     <button class="btn" id="sCats" style="width:100%;margin-top:10px">Categories</button>
@@ -2706,7 +2716,7 @@ function openSettings() {
     if (err) return toast("Couldn't save: " + err);
     rulesCache = null; close(); render(); toast(demo ? "Preview only: saved for this visit" : "Saved");
   };
-  document.querySelectorAll("[data-th]").forEach((b) => b.onclick = () => { setTheme(b.dataset.th); document.querySelectorAll("[data-th]").forEach((x) => x.classList.toggle("on", x === b)); render(); });
+  document.querySelectorAll("[data-th]").forEach((b) => b.onclick = () => { setAppearance(b.dataset.th); document.querySelectorAll("[data-th]").forEach((x) => x.classList.toggle("on", x === b)); render(); });
   $("sRefresh").onclick = () => { close(); toast("Refreshing…"); load(); };
   $("sCats").onclick = () => { close(); openCategories(); };
   $("sApp").onclick = () => { close(); openAppSheet(); };
