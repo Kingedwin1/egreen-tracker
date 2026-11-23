@@ -169,7 +169,7 @@ svg text{fill:var(--muted);font-size:11px;font-family:inherit}
 .whero svg{display:block;width:100%;height:46px}
 .scrollrow{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;margin-bottom:18px;scrollbar-width:none}
 .scrollrow .w{flex:0 0 150px;min-height:110px;cursor:default}
-/* hero + lists (Egreen layout) */
+/* hero + lists */
 .hero{background:var(--brand);color:#fff;border-radius:16px;padding:18px 18px 16px;margin:8px 0 18px;position:relative;overflow:hidden}
 .hero:before{content:"";position:absolute;right:-30px;top:-30px;width:120px;height:120px;border:18px solid var(--leaf);opacity:.18;transform:rotate(45deg)}
 .hero .l{font-size:13px;opacity:.75;font-weight:600;letter-spacing:.02em;text-transform:uppercase}
@@ -1107,12 +1107,12 @@ function guessSpace(text        , preset        , businessName = "")            
 }
 
 // Which ledger a receipt belongs to, from the account holder's name on it.
-// personalName: e.g. "Okoli Edwin" (every word must appear, any order). businessName: e.g. "Egreen".
+// personalName: e.g. "Ada Obi" (every word must appear, any order). businessName: e.g. "Ada Foods".
 const NAME_FILLER = new Set(["ltd", "limited", "plc", "nig", "nigeria", "enterprises", "enterprise", "ventures", "global", "services", "the", "and", "co", "company", "concept", "concepts", "innovative", "int", "international"]);
 function spaceFromOwner(owner        , personalName        , businessName        )               {
   const o = norm(owner);
   if (!o) return null;
-  // Business: its distinctive words must appear (so "Egreen" matches "EGREEN INNOVATIVE CONCEPT LTD")
+  // Business: its distinctive words must appear (so "Ada Foods" matches "ADA FOODS LIMITED")
   const allBw = norm(businessName).split(" ").filter((w) => w.length > 1);
   const bw = allBw.filter((w) => !NAME_FILLER.has(w)).length ? allBw.filter((w) => !NAME_FILLER.has(w)) : allBw;
   if (bw.length && bw.every((w) => new RegExp(`(^|\\s)${w}`).test(o))) return "business";
@@ -1126,7 +1126,7 @@ function finish(base                                                            
   const preset = opts.preset ?? "general";
   const basis = `${base.narration} ${base.counterparty}`;
   if (base.direction === "credit") {
-    // Money from your own business into your pocket (e.g. salary from Egreen) is personal income
+    // Money from your own business into your pocket (e.g. salary from your company) is personal income
     const fromOwnBiz = !!opts.businessName && spaceFromOwner(base.counterparty, "", opts.businessName) === "business";
     return { ...base, category_personal: incomeCategory(basis, "personal"), category_business: incomeCategory(basis, "business"), likely_space: fromOwnBiz ? "personal" : guessSpace(basis, preset, opts.businessName), confidence: 0.6 };
   }
@@ -1171,7 +1171,7 @@ function parseReceiptText(text        , today        , opts            = {})    
 
 // Typed entries.
 // Spending:  "5000 diesel for gen business", "2.5k lunch", "₦12,000 cables for Lekki job"
-// Money in:  "+50000 from Mr Adebayo solar balance", "received 150k from Egreen salary", "income 20k gift from mum"
+// Money in:  "+50000 from Mr Adebayo solar balance", "received 150k from Ada Foods salary", "income 20k gift from mum"
 function parseManual(text        , today        , opts            = {})                  {
   const lead = text.match(/^\s*(\+|received|recieved|got|income|credit|money in)\s*:?\s*/i);
   const body = lead ? text.slice(lead[0].length) : text;
@@ -2317,7 +2317,7 @@ window.addEventListener("resize", () => { clearTimeout(window.__r); window.__r =
 const fmtPhone = (d) => { d = String(d || "").replace(/\D/g, ""); return d.length === 13 ? `+${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)} ${d.slice(9)}` : "+" + d; };
 const BOT_DISPLAY = fmtPhone(BOT_NUMBER);
 const waLink = (code) => `https://wa.me/${BOT_NUMBER}?text=${encodeURIComponent("LINK " + code)}`;
-const DEMO_PROFILE = { user_id: "demo", email: "you@example.com", full_name: "Okoli Edwin", has_business: true, business_name: "Egreen", business_preset: "solar", whatsapp: null, onboarded: true,
+const DEMO_PROFILE = { user_id: "demo", email: "you@example.com", full_name: "Ada Obi", has_business: true, business_name: "Brightline Solar", business_preset: "solar", whatsapp: null, onboarded: true,
   home_prefs: { accounts: {
     personal: [{ name: "Kuda", balance: 310000, as_of: "2000-01-01T00:00:00Z" }, { name: "GTBank", balance: 540000, as_of: "2000-01-01T00:00:00Z" }],
     business: [{ name: "Moniepoint", balance: 4200000, as_of: "2000-01-01T00:00:00Z" }, { name: "Access", balance: 1350000, as_of: "2000-01-01T00:00:00Z" }, { name: "OPay", balance: 640000, as_of: "2000-01-01T00:00:00Z" }],
@@ -2435,7 +2435,7 @@ function screenMfa() {
       <button class="btn primary big" id="mfaGo" type="submit">Verify</button>
       <div id="authErr" class="auth-err hidden"></div>
     </form>
-    <p class="fine center">Lost your phone? Email <a href="mailto:hello@egreenconcept.com">hello@egreenconcept.com</a> from this email address and we'll help you back in.</p>
+    <p class="fine center">Lost your phone? Email <a href="mailto:support@egom.ng">support@egom.ng</a> from this email address and we'll help you back in.</p>
     <p class="fine center"><button class="linkbtn" id="mfaOut">Use a different account</button></p>`);
   const inp = $("mfaIn"); inp.focus();
   inp.oninput = () => { inp.value = inp.value.replace(/\D/g, "").slice(0, 6); if (inp.value.length === 6) $("mfaForm").requestSubmit(); };
@@ -2537,7 +2537,7 @@ function screenName() {
     <h2 class="step-h">What name is on your bank account?</h2>
     <p class="step-p">Egom uses it to tell which receipts are yours. Type it the way your bank writes it.</p>
     <form id="nameForm" class="auth-form">
-      <input id="nameIn" autocomplete="name" placeholder="e.g. Okoli Edwin" required value="${esc(profile.full_name || "")}">
+      <input id="nameIn" autocomplete="name" placeholder="e.g. Ada Obi" required value="${esc(profile.full_name || "")}">
       <button class="btn primary big" type="submit">Continue</button>
       <div id="authErr" class="auth-err hidden"></div>
     </form>`);
@@ -2564,7 +2564,7 @@ function screenBusiness() {
     <form id="bizForm" class="auth-form">
       <div id="bizFields" class="${d.has_business ? "" : "hidden"}">
         <label for="bizIn">Business name, as on its bank account</label>
-        <input id="bizIn" placeholder="e.g. Egreen Innovative Concept Ltd" value="${esc(d.business_name)}">
+        <input id="bizIn" placeholder="e.g. Ada Foods Ltd" value="${esc(d.business_name)}">
         <label>What kind of business is it?</label>
         <div class="kinds">${EX.BUSINESS_KINDS.map(([k, v]) => `<button type="button" data-p="${k}" aria-pressed="${d.business_preset === k}" class="${d.business_preset === k ? "on" : ""}">${v}</button>`).join("")}</div>
         <p class="fine">This picks the starting categories. You can change it later.</p>
@@ -3274,7 +3274,7 @@ function demoRows() {
     add(d(mo, 20), "23:27", "personal", 5000, "Health", "Gym", "gym", "OPay");
     add(d(mo, 21), "20:10", "personal", 40000, "Family & Support", "Mum", "upkeep", "GTBank", 25);
     add(d(mo, 27), "10:30", "personal", 12000, "Bills & Utilities", "IKEDC", "prepaid meter", "OPay", 10);
-    add(d(mo, 26), "10:00", "personal", 150000, "Other", "Egreen Innovative Concept", "salary", "Access", 0, "income");
+    add(d(mo, 26), "10:00", "personal", 150000, "Other", "Brightline Solar Ltd", "salary", "Access", 0, "income");
   }
   const today = d(0, now.getDate());
   return out.filter((r) => r.tx_date <= today);
