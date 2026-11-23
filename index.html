@@ -2308,13 +2308,13 @@ function screenCode() {
   showAuth(`
     <button class="linkbtn back" id="backEmail">‹ Back</button>
     <h2 class="step-h">Check your email</h2>
-    <p class="step-p">Enter the 6-digit code we sent to <b>${esc(authEmail)}</b>. It can take a minute, and sometimes lands in spam.</p>
+    <p class="step-p">We sent a sign-in email to <b>${esc(authEmail)}</b>. Tap the link in it to sign in, or type the 6-digit code here if the email shows one. It can take a minute, and sometimes lands in spam.</p>
     <form id="codeForm" class="auth-form">
       <input id="codeIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="••••••" required>
       <button class="btn primary big" id="codeGo" type="submit">Verify</button>
       <div id="authErr" class="auth-err hidden"></div>
     </form>
-    <p class="fine center"><button class="linkbtn" id="resend" disabled>Resend code</button></p>
+    <p class="fine center"><button class="linkbtn" id="resend" disabled>Resend email</button></p>
     ${demo ? `<p class="fine center">Preview: any 6 digits work.</p>` : ""}`);
   $("backEmail").onclick = screenEmail;
   const inp = $("codeIn"); inp.focus();
