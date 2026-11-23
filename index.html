@@ -1560,8 +1560,16 @@ function toast(t) { const el = document.createElement("div"); el.className = "to
 const bankKey = (b) => { b = String(b || "").trim(); if (!b) return "Other / unknown"; const k = Object.keys(BANK_STYLE).find((x) => b.toLowerCase().includes(x.toLowerCase())); return k || b; };
 
 /* ============ data ============ */
+let demoKeep = null;
 async function load() {
-  if (demo) { rows = demoRows(); budgets = demoBudgets(); return render(); }
+  if (demo) {
+    // The preview keeps its records for the visit, and picks up what the sample business adds (Got paid, vendor payments)
+    if (!demoKeep) { demoKeep = demoRows(); budgets = demoBudgets(); }
+    const extra = (window.MockEgom && window.MockEgom.db.expenses) || [];
+    for (let i = demoKeep.length - 1; i >= 0; i--) if (demoKeep[i]._mock && !extra.some((m) => m.id === demoKeep[i].id)) demoKeep.splice(i, 1);
+    extra.forEach((m) => { const have = demoKeep.find((r) => r.id === m.id); if (have) Object.assign(have, m); else demoKeep.push({ ...m, _mock: true }); });
+    rows = demoKeep; return render();
+  }
   const [{ data, error }, b] = await Promise.all([
     sb.from("expenses").select("*").eq("status", "saved").order("tx_date", { ascending: false }).limit(5000),
     sb.from("budgets").select("*"),
@@ -1626,7 +1634,7 @@ function render() {
 }
 
 /* ============ Egom Business (business.js): invoices, quotes, customers, reports ============ */
-const BIZ_VERSION = "8";   // raise with every business.js update so phones fetch the new copy
+const BIZ_VERSION = "10";   // raise with every business.js update so phones fetch the new copy
 let bizLoading = null;
 function loadBusiness() {
   if (window.EgomBusiness) return Promise.resolve(window.EgomBusiness);
@@ -1655,6 +1663,12 @@ function shareEgom() {
     renderBanks: () => renderAccounts(),
     heroSpark: () => profitSpark(),
     categories: () => CATEGORIES.business,
+    // Money in and out for a month, from Egom's own records (receipts, WhatsApp, payments recorded with Got paid, vendor payments)
+    monthIO: (v) => { const cur = monthRows(v || ym); return { in: sum(incomes(cur), (r) => Number(r.amount) || 0), out: sum(expenses(cur)) }; },
+    topSpend: (n) => [...catTotals(expenses(monthRows(ym))).entries()].sort((a, b) => b[1] - a[1]).slice(0, n || 4).map(([c, v]) => ({ name: c, naira: v, color: colorOf(c), icon: catIcon(c) })),
+    recentHTML: (n) => { const list = rows.filter((r) => inLedger(r) && r.kind !== "transfer").sort((a, b) => (b.tx_date || "").localeCompare(a.tx_date || "") || (b.created_at || "").localeCompare(a.created_at || "")).slice(0, n || 6);
+      return list.map((r) => txRow(r).replace('<small>' + esc((r.tx_time || "").slice(0, 5)) + '</small>', '<small>' + esc(prettyDay(r.tx_date)) + '</small>')).join(""); },
+    openTx: (id) => openTx(id),
     bankSummary: () => {
       const names = accountNames(), known = names.map((n) => [n, accountBalance(n)]).filter(([, v]) => v !== null);
       const isCash = (n) => /cash/i.test(n);
@@ -2434,7 +2448,7 @@ window.addEventListener("resize", () => { clearTimeout(window.__r); window.__r =
 const fmtPhone = (d) => { d = String(d || "").replace(/\D/g, ""); return d.length === 13 ? `+${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)} ${d.slice(9)}` : "+" + d; };
 const BOT_DISPLAY = fmtPhone(BOT_NUMBER);
 const waLink = (code) => `https://wa.me/${BOT_NUMBER}?text=${encodeURIComponent("LINK " + code)}`;
-const DEMO_PROFILE = { user_id: "demo", email: "you@example.com", full_name: "Ada Obi", has_business: true, business_name: "Bright Homes Ltd", business_preset: "building", whatsapp: null, onboarded: true,
+const DEMO_PROFILE = { user_id: "demo", email: "you@example.com", full_name: "Ada Obi", has_business: true, business_name: "Bright Homes Ltd", business_preset: "building", whatsapp: "2348012345678", onboarded: true,
   home_prefs: { accounts: {
     personal: [{ name: "Kuda", balance: 310000, as_of: "2000-01-01T00:00:00Z" }, { name: "GTBank", balance: 540000, as_of: "2000-01-01T00:00:00Z" }],
     business: [{ name: "Moniepoint", balance: 4200000, as_of: "2000-01-01T00:00:00Z" }, { name: "Access", balance: 1350000, as_of: "2000-01-01T00:00:00Z" }, { name: "OPay", balance: 640000, as_of: "2000-01-01T00:00:00Z" }],

@@ -28,6 +28,7 @@
   const P = {
     home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
     copy: "M9 9h11v11H9z M5 15H4V4h11v1",
+    check: "M20 6 9 17l-5-5",
     cart: "M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H6.2 M9 20.5h.01 M17 20.5h.01",
     doc: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M8 13h8 M8 17h5",
     docPlus: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M12 12v6 M9 15h6",
@@ -249,22 +250,27 @@
     const r = S.report || {}, open = S.invoices.filter(isOpen), late = open.filter(isLate);
     const owed = open.reduce((a, i) => a + balance(i), 0), lateAmt = late.reduce((a, i) => a + balance(i), 0);
     const oldest = late.reduce((a, i) => Math.max(a, daysBetween(i.due_date, today())), 0);
-    const profit = (r.sales || 0) - (r.spent || 0);
+    // Money in and out as Egom records it (Got paid, receipts, WhatsApp, vendor payments), so the hero matches the line under it
+    const ymNow = (E() && E().ym) || today().slice(0, 7);
+    const io = E().monthIO ? E().monthIO(ymNow) : null;
+    const mIn = io ? Math.round(io.in * 100) : (r.sales || 0), mOut = io ? Math.round(io.out * 100) : (r.spent || 0);
+    const profit = mIn - mOut;
     // Same numbers as the Banks page (naira from the app, shown here in kobo)
     const bs = (E().bankSummary && E().bankSummary()) || { known: 0, names: 0, total: 0, bank: 0, cash: 0 };
     const money = Math.round(bs.total * 100), bank = Math.round(bs.bank * 100), cash = Math.round(bs.cash * 100);
     const neg = !bs.known;
-    const months = r.months || [];
-    const prev = months.length >= 2 ? months[months.length - 2] : null;
-    const prevProfit = prev ? prev.in - prev.out : null;
-    const delta = prevProfit && prevProfit > 0 ? Math.round((profit - prevProfit) / prevProfit * 100) : null;
+    let prevProfit = null;
+    if (io) { const [yy, mm] = ymNow.split("-").map(Number), d = new Date(yy, mm - 2, 1), pym = d.getFullYear() + "-" + pad2(d.getMonth() + 1), pio = E().monthIO(pym); prevProfit = Math.round((pio.in - pio.out) * 100); }
+    else { const months = r.months || [], prev = months.length >= 2 ? months[months.length - 2] : null; prevProfit = prev ? prev.in - prev.out : null; }
+    const spentOnly = !mIn && mOut > 0;
+    const delta = !spentOnly && prevProfit && prevProfit > 0 ? Math.round((profit - prevProfit) / prevProfit * 100) : null;
     return `
-      <div class="bz-row bz-head"><span class="bz-row bz-gap bz-grow">${S.biz.logo_path ? `<img class="bz-hlogo" src="${esc(S.biz.logo_path)}" alt="">` : ""}<h2>${esc(S.biz.name)}</h2></span><button class="bz-icon" id="bzSettings" type="button" aria-label="Business details">${svg(P.gear)}</button></div>
+      <div class="bz-row bz-head"><span class="bz-row bz-gap bz-grow"><h2>${esc(S.biz.name)}</h2></span><button class="bz-icon" id="bzSettings" type="button" aria-label="Business details">${svg(P.gear)}</button></div>
       <section class="g-hero">
-        <div class="gh-top"><div><p class="gl">${profit < 0 ? "Loss this month" : "Profit this month"}</p><p class="gbig">${profit < 0 ? "−" : ""}${K(Math.abs(profit))}</p></div>
+        <div class="gh-top"><div><p class="gl">${spentOnly ? "Spent this month" : profit < 0 ? "Loss this month" : "Profit this month"}</p><p class="gbig">${profit < 0 && !spentOnly ? "−" : ""}${K(Math.abs(profit))}</p></div>
           ${delta !== null ? `<p class="bz-delta ${delta < 0 ? "dn" : ""}">${delta < 0 ? "▼" : "▲"} ${Math.abs(delta)}% vs last month</p>` : ""}</div>
         ${(() => { const sp = E().heroSpark ? E().heroSpark() : ""; return sp ? `<div class="gspark">${sp}</div>` : ""; })()}
-        <div class="gh-io"><div><p class="gl">Money in</p><p class="gv" style="color:#C6F432">+${K(r.sales || 0)}</p></div><div><p class="gl">Money out</p><p class="gv">−${K(r.spent || 0)}</p></div></div>
+        <div class="gh-io"><div><p class="gl">Money in</p><p class="gv" style="color:#C6F432">+${K(mIn)}</p></div><div><p class="gl">Money out</p><p class="gv">−${K(mOut)}</p></div></div>
       </section>
       <div class="bz-grid2">
         <button class="gt solid bz-amber" id="bzOwed" type="button">
@@ -275,31 +281,57 @@
           <div><p class="gn">Cash and bank</p><p class="gamt xl">${neg ? "—" : (money < 0 ? "−" : "") + K(Math.abs(money))}</p>
           <p class="gs">${neg ? (bs.names ? "Set your balances" : "Add your banks") : `Bank ${shortK(bank)} · Cash ${shortK(cash)}`}</p></div></button>
       </div>
-      ${late.length ? `<button class="bz-alert" id="bzLate" type="button"><span class="bz-alert-ic">${svg(P.clock, 18)}</span>
-        <span class="bz-grow"><b>${late.length} invoice${late.length === 1 ? " is" : "s are"} late</b><small>${K(lateAmt)} · oldest is ${oldest} day${oldest === 1 ? "" : "s"}</small></span>
-        <span class="bz-alert-btn">${late.length === 1 ? "Remind" : "See"}</span></button>` : ""}
-      ${owedOut() ? (() => { const lp = S.purchases.filter(pLate), due = S.purchases.filter((p) => pOpen(p) && p.due_date && !pLate(p) && daysBetween(today(), p.due_date) <= 7);
-        return `<button class="bz-alert bz-owe" id="bzOwe" type="button"><span class="bz-alert-ic">${svg(P.cart, 18)}</span>
-        <span class="bz-grow"><b>You owe vendors ${K(owedOut())}</b><small>${lp.length ? `${lp.length} overdue` : due.length ? `${due.length} due this week` : `${S.purchases.filter(pOpen).length} to pay`}</small></span>
-        <span class="bz-alert-btn">See</span></button>`; })() : ""}
       <div class="bz-quick">
         ${[["qInv", "Invoice", P.docPlus, ""], ["qQuote", "Quote", P.quote, ""], ["qPaid", "Got paid", P.down, "lime"], ["qSpent", "Spent", P.up, ""]]
           .map(([id, l, d, c]) => `<button type="button" id="${id}"><span class="bz-qc ${c}">${svg(d, 22)}</span><span>${l}</span></button>`).join("")}
       </div>
       ${!S.invoices.length && !S.quotes.length ? `<section class="gcard bz-card bz-start"><h3>Start with your first invoice</h3>
         <p class="fine">Add a customer and what you sold. Egom works out the totals, numbers it, and gives you a link to send on WhatsApp.</p>
-        <button class="bz-btn primary" id="bzFirst" type="button">New invoice</button></section>` : ""}`;
+        <button class="bz-btn primary" id="bzFirst" type="button">New invoice</button></section>` : ""}
+      ${homeMore(late, lateAmt, oldest)}`;
+  }
+  // Under the quick buttons: what needs doing, where the money went, and the latest records
+  function homeMore(late, lateAmt, oldest) {
+    const todo = [];
+    if (late.length) todo.push(["bzLate", "late", P.clock, `${late.length} invoice${late.length === 1 ? " is" : "s are"} late`, `${K(lateAmt)} · oldest ${oldest} day${oldest === 1 ? "" : "s"}`, late.length === 1 ? "Remind" : "See"]);
+    const lp = S.purchases.filter(pLate), soon = S.purchases.filter((p) => pOpen(p) && p.due_date && !pLate(p) && daysBetween(today(), p.due_date) <= 7);
+    if (lp.length) todo.push(["bzOwe", "late", P.cart, `${lp.length} bill${lp.length === 1 ? "" : "s"} overdue`, `${K(lp.reduce((a, p) => a + pBal(p), 0))} to pay vendors`, "See"]);
+    else if (soon.length) todo.push(["bzOwe", "amber", P.cart, `${soon.length} bill${soon.length === 1 ? "" : "s"} due this week`, `${K(soon.reduce((a, p) => a + pBal(p), 0))} to pay vendors`, "See"]);
+    else if (owedOut()) todo.push(["bzOwe", "amber", P.cart, `You owe vendors ${K(owedOut())}`, `${S.purchases.filter(pOpen).length} to pay`, "See"]);
+    const drafts = S.invoices.filter((i) => i.status === "draft");
+    if (drafts.length) todo.push(["bzDrafts", "", P.doc, `${drafts.length} draft invoice${drafts.length === 1 ? "" : "s"} not sent`, `${K(drafts.reduce((a, i) => a + i.total_kobo, 0))} waiting to go out`, "See"]);
+    const waitQ = S.quotes.filter((q) => q.status === "sent");
+    if (waitQ.length) todo.push(["bzWaitQ", "", P.quote, `${waitQ.length} quote${waitQ.length === 1 ? "" : "s"} waiting for a reply`, `${K(waitQ.reduce((a, q) => a + q.total_kobo, 0))} in all`, "See"]);
+    const top = E().topSpend ? E().topSpend(4) : [], topMax = top.length ? top[0].naira : 1;
+    const recent = E().recentHTML ? E().recentHTML(6) : "";
+    return `<div class="bz-homegrid">
+      <section class="gcard bz-card bz-hsec bz-hrecent"><div class="bz-row"><h3>Latest</h3><button class="bz-link" id="bzSeeAll" type="button">See all</button></div>
+        ${recent ? `<div class="bz-hlist">${recent}</div>` : `<p class="fine">Nothing recorded yet. Forward a receipt on WhatsApp, or tap Spent or Got paid.</p>`}</section>
+      <div class="bz-hside">
+        <section class="gcard bz-card bz-hsec"><h3>Needs attention</h3>
+          ${todo.length ? todo.map(([id, tone, d, t, sm, btn]) => `<button class="bz-todo ${tone}" id="${id}" type="button"><span class="bz-todo-ic">${svg(d, 17)}</span>
+            <span class="bz-grow"><b>${t}</b><small>${sm}</small></span><span class="bz-todo-btn">${btn}</span></button>`).join("")
+            : `<p class="fine bz-ok">${svg(P.check, 16)} All caught up. Nothing late, nothing waiting.</p>`}</section>
+        <section class="gcard bz-card bz-hsec bz-hspend"><div class="bz-row"><h3>Where the money went</h3><span class="fine" style="margin:0">this month</span></div>
+          ${top.length ? top.map((c) => `<div class="bz-catbar"><span class="bz-catic" style="background:${c.color[0]};color:${c.color[1]}">${c.icon}</span>
+            <span class="bz-grow"><span class="bz-row"><b>${esc(c.name)}</b><b>${K(Math.round(c.naira * 100))}</b></span><i class="bz-track"><i style="width:${Math.max(4, c.naira / topMax * 100)}%;background:${c.color[1]}"></i></i></span></div>`).join("")
+            : `<p class="fine">No spending recorded this month.</p>`}</section>
+      </div></div>`;
   }
   function wireHome() {
     $("bzSettings").onclick = openSettings;
     $("bzOwed").onclick = () => { S.tab = "docs"; S.docMode = "invoices"; S.filter = "unpaid"; saveUi(); draw(); };
     $("bzMoney").onclick = () => { S.tab = "banks"; saveUi(); draw(); window.scrollTo(0, 0); };
+    if ($("bzOwe")) $("bzOwe").onclick = () => { S.tab = "purchases"; S.filter = S.purchases.some(pLate) ? "late" : "unpaid"; saveUi(); draw(); window.scrollTo(0, 0); };
+    if ($("bzDrafts")) $("bzDrafts").onclick = () => { S.tab = "docs"; S.filter = "draft"; saveUi(); draw(); window.scrollTo(0, 0); };
+    if ($("bzWaitQ")) $("bzWaitQ").onclick = () => { S.tab = "quotes"; S.filter = "open"; saveUi(); draw(); window.scrollTo(0, 0); };
+    if ($("bzSeeAll")) $("bzSeeAll").onclick = () => { S.tab = "expenses"; saveUi(); draw(); window.scrollTo(0, 0); };
+    document.querySelectorAll(".bz-hlist .tx").forEach((el) => el.onclick = () => E().openTx && E().openTx(el.dataset.id));
     if ($("bzLate")) $("bzLate").onclick = () => {
       const late = S.invoices.filter(isLate);
       if (late.length === 1) return remind(late[0]);
       S.tab = "docs"; S.docMode = "invoices"; S.filter = "late"; saveUi(); draw();
     };
-    if ($("bzOwe")) $("bzOwe").onclick = () => { S.tab = "purchases"; S.filter = S.purchases.some(pLate) ? "late" : "unpaid"; saveUi(); draw(); window.scrollTo(0, 0); };
     $("qInv").onclick = () => openEditor("invoice");
     $("qQuote").onclick = () => openEditor("quote");
     $("qPaid").onclick = () => openPayment();
@@ -723,15 +755,18 @@
         ${st.mode !== "cash" ? `<label for="bzpAcc">Into <span class="opt">optional</span></label><input id="bzpAcc" list="bzpAccL" value="${esc(st.account)}" placeholder="e.g. GTBank, Moniepoint" autocomplete="off">
           <datalist id="bzpAccL">${accountNames().map((n) => `<option value="${esc(n)}">`).join("")}</datalist>` : ""}
         <label for="bzpRef">Reference <span class="opt">optional</span></label><input id="bzpRef" value="${esc(st.reference)}" placeholder="From the transfer alert">
-        ${toKobo(st.amount) ? `<p class="fine">${p.out.length ? "Pays " + p.out.map((a) => { const i = S.invoices.find((x) => x.id === a.invoice_id); return `${esc(i.number)} (${K(a.amount_kobo)}${a.amount_kobo < balance(i) ? ", part" : ""})`; }).join(", ") : ""}${p.extra > 0 ? `${p.out.length ? ". " : ""}${K(p.extra)} kept as credit for this customer` : ""}.</p>` : ""}
+        <p class="fine" id="bzpPlan">${planText(p)}</p>
         <button class="bz-btn primary wide big" id="bzpSave" type="button">Save payment</button>`;
       $("bzpCust").onchange = () => { st.customer_id = $("bzpCust").value; st.picked = null; st.amount = ""; paint(); };
       document.querySelectorAll("[data-pk]").forEach((c) => c.onchange = () => { keep(); st.picked = [...document.querySelectorAll("[data-pk]:checked")].map((x) => x.dataset.pk);
         st.amount = nairaInput(openFor().filter((i) => st.picked.includes(i.id)).reduce((a, i) => a + balance(i), 0)); paint(); });
       document.querySelectorAll("[data-md]").forEach((b) => b.onclick = () => { keep(); st.mode = b.dataset.md; paint(); });
-      $("bzpAmt").onchange = () => { keep(); paint(); };
+      // Typing the amount only updates the line under it; a full repaint here would swallow the tap on Save
+      $("bzpAmt").oninput = () => { keep(); $("bzpPlan").innerHTML = planText(plan()); };
       $("bzpSave").onclick = saveIt;
     };
+    const planText = (p) => !toKobo(st.amount) ? "" : (p.out.length ? "Pays " + p.out.map((a) => { const i = S.invoices.find((x) => x.id === a.invoice_id); return `${esc(i.number)} (${K(a.amount_kobo)}${a.amount_kobo < balance(i) ? ", part" : ""})`; }).join(", ") : "")
+      + (p.extra > 0 ? `${p.out.length ? ". " : ""}${K(p.extra)} kept as credit for this customer` : "") + ".";
     const keep = () => { st.amount = $("bzpAmt").value; st.date = $("bzpDate").value; st.reference = $("bzpRef").value; if ($("bzpAcc")) st.account = $("bzpAcc").value; };
     async function saveIt() {
       keep();
@@ -1499,6 +1534,24 @@
 .bz-icon.sm{width:34px;height:34px;flex:0 0 auto}
 .bz-delta{margin:0;font-size:12px;font-weight:600;color:#C6F432;white-space:nowrap}.bz-delta.dn{color:#FF8A7D}
 .bz-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.bz-homegrid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:4px}
+.bz-hside{display:flex;flex-direction:column;gap:12px;min-width:0}
+.bz-hsec{padding:16px 16px 10px}.bz-hsec h3{font-size:17px;margin:0 0 8px}.bz-hsec > .bz-row{justify-content:space-between;align-items:baseline;margin-bottom:6px}.bz-hsec > .bz-row h3{margin:0}
+.bz-hlist{margin:0 -16px}.bz-hlist .tx{padding:11px 16px}
+.bz-todo{display:flex;align-items:center;gap:12px;width:100%;padding:10px 0;border:0;border-top:1px solid var(--grid);background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.bz-hsec h3 + .bz-todo{border-top:0}
+.bz-todo b{display:block;font-size:14px}.bz-todo small{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+.bz-todo-ic{flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--raise);color:var(--ink)}
+.bz-todo.late .bz-todo-ic{background:color-mix(in srgb,#FF7A6B 22%,transparent);color:var(--exp)}.bz-todo.late small{color:var(--exp)}
+.bz-todo.amber .bz-todo-ic{background:color-mix(in srgb,#FFBE3D 26%,transparent);color:#C98A00}
+.bz-todo-btn{flex:0 0 auto;height:32px;padding:0 13px;border-radius:999px;background:var(--ink);color:var(--bg);display:flex;align-items:center;font-size:12.5px;font-weight:700}
+.bz-ok{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+.bz-catbar{display:flex;align-items:center;gap:12px;padding:8px 0}
+.bz-catbar .bz-row{justify-content:space-between;gap:8px}.bz-catbar b{font-size:13.5px}.bz-catbar b:first-child{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bz-catic{flex:0 0 auto;width:34px;height:34px;border-radius:10px;display:grid;place-items:center}.bz-catic .ico{width:18px;height:18px}
+.bz-track{display:block;height:6px;border-radius:99px;background:var(--track);margin-top:6px;overflow:hidden}.bz-track i{display:block;height:100%;border-radius:99px}
+@media (max-width:1023px){.bz-hspend{display:none}.bz-hlist .tx:nth-child(n+5){display:none}}
+@media (min-width:1024px){.bz-homegrid{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}}
 .bz-grid2 .gt{min-height:156px}
 .gt.bz-amber{background:#FFBE3D!important;color:#0E0E0E}
 .bz-small{font-size:12px;font-weight:600}
