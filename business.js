@@ -1265,7 +1265,9 @@
           <input type="file" id="bzsLogo" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden>
           <button class="bz-link danger" id="bzsLogoX" type="button" ${b.logo_path ? "" : "hidden"}>Remove</button></div>
       </div>
-      <p class="fine">A PNG with a clear background looks best. Egom shrinks it to fit.</p>
+      <div id="bzsSizeRow" ${b.logo_path ? "" : "hidden"}><label>Logo size on invoices</label>
+        <div class="bz-chips small" role="group" aria-label="Logo size" id="bzsSize"></div></div>
+      <p class="fine">A PNG with a clear background looks best. Egom trims empty space around it and shrinks it to fit.</p>
       <label>Brand colour</label>
       <div class="bz-swatches" role="radiogroup" aria-label="Brand colour" id="bzsSw"></div>
       <div class="bz-row bz-gap" style="margin-top:8px"><input type="color" id="bzsCol" value="${esc(b.brand_color || "#C6F432")}" aria-label="Pick any colour"><span class="fine" id="bzsColTxt" style="margin:0"></span>
@@ -1284,17 +1286,20 @@
       <label for="bzsPad">Digits</label><select id="bzsPad">${[1, 2, 3, 4, 5, 6].map((n) => `<option ${n === b.number_pad ? "selected" : ""}>${n}</option>`).join("")}</select>
       <p class="fine" id="bzsEx">Next invoice: ${esc(nextNumberHint("invoice"))}</p>
       <button class="bz-btn primary wide big" id="bzsSave" type="button">Save</button>`);
-    const brand = { logo: b.logo_path || null, color: b.brand_color || null };
+    const brand = { logo: b.logo_path || null, color: b.brand_color || null, scale: Number(b.logo_scale) || 1 };
+    const SIZES = [[0.75, "Small"], [1, "Medium"], [1.4, "Large"], [1.8, "Extra large"]];
     const SW = [["#C6F432", "Lime"], ["#42BA50", "Green"], ["#16813A", "Deep green"], ["#0E0932", "Midnight"], ["#1E6FD9", "Blue"], ["#7A3FD1", "Purple"], ["#E0533F", "Red"], ["#F2A900", "Gold"], ["#0E0E0E", "Black"]];
     const paintBrand = () => {
       $("bzsLogoBox").innerHTML = brand.logo ? `<img src="${esc(brand.logo)}" alt="Your logo">` : `<span>No logo yet</span>`;
-      $("bzsLogoX").hidden = !brand.logo; $("bzsFromLogo").hidden = !brand.logo;
+      $("bzsLogoX").hidden = !brand.logo; $("bzsFromLogo").hidden = !brand.logo; $("bzsSizeRow").hidden = !brand.logo;
+      $("bzsSize").innerHTML = SIZES.map(([v, l]) => `<button type="button" data-ls="${v}" class="${Math.abs(brand.scale - v) < 0.01 ? "on" : ""}" aria-pressed="${Math.abs(brand.scale - v) < 0.01}">${l}</button>`).join("");
+      $("bzsSize").querySelectorAll("[data-ls]").forEach((x) => x.onclick = () => { brand.scale = Number(x.dataset.ls); paintBrand(); });
       document.querySelector('label[for="bzsLogo"]').innerHTML = `${svg(P.plus, 15)} ${brand.logo ? "Change logo" : "Upload logo"}`;
       $("bzsSw").innerHTML = SW.map(([c, n]) => `<button type="button" role="radio" aria-checked="${brand.color === c}" aria-label="${n}" data-sw="${c}" class="${brand.color === c ? "on" : ""}" style="background:${c}"></button>`).join("");
       $("bzsSw").querySelectorAll("[data-sw]").forEach((x) => x.onclick = () => { brand.color = x.dataset.sw; $("bzsCol").value = brand.color; paintBrand(); });
       $("bzsCol").value = brand.color || "#C6F432";
       $("bzsColTxt").textContent = brand.color ? brand.color.toUpperCase() : "Egom lime (default)";
-      $("bzsMini").innerHTML = miniHeader($("bzsN") ? $("bzsN").value || b.name : b.name, brand.logo, brand.color);
+      $("bzsMini").innerHTML = miniHeader($("bzsN") ? $("bzsN").value || b.name : b.name, brand.logo, brand.color, brand.scale);
     };
     $("bzsCol").oninput = (e) => { brand.color = e.target.value.toUpperCase(); paintBrand(); };
     $("bzsLogo").onchange = async (e) => {
@@ -1314,6 +1319,7 @@
         invoice_prefix: $("bzsIp").value, invoice_next: Math.max(1, parseInt($("bzsIn").value, 10) || 1),
         quote_prefix: $("bzsQp").value, quote_next: Math.max(1, parseInt($("bzsQn").value, 10) || 1), number_pad: +$("bzsPad").value || 4,
         logo_path: brand.logo, brand_color: brand.color, updated_at: new Date().toISOString() };
+      if ("logo_scale" in b) row.logo_scale = brand.scale;
       busy("bzsSave", true);
       try { const saved = await rows(sb().from("businesses").update(row).eq("id", b.id).select()); Object.assign(S.biz, saved[0] || row); close(); draw(); E().toast("Saved"); }
       catch (e) { busy("bzsSave", false); E().toast(e.message); }
@@ -1326,7 +1332,7 @@
     const b = d.business || {}, c = d.customer || {};
     const accent = b.brand_color || "#C6F432", onAccent = inkOn(accent);
     return `<article class="bz-paper" style="--bz-accent:${accent};--bz-on:${onAccent}">
-      <header><div class="bz-pbrand">${b.logo_path ? `<img class="bz-plogo" src="${esc(b.logo_path)}" alt="${esc(b.name)} logo">` : ""}
+      <header><div class="bz-pbrand">${b.logo_path ? `<img class="bz-plogo" src="${esc(b.logo_path)}" alt="${esc(b.name)} logo" style="max-height:${Math.round(64 * (Number(b.logo_scale) || 1))}px;max-width:${Math.round(220 * (Number(b.logo_scale) || 1))}px">` : ""}
         <div><h1>${esc(b.name)}</h1><p>${esc([b.address, b.phone, b.email].filter(Boolean).join(" · "))}</p></div></div>
         <div class="bz-ptitle"><h2>${isInv ? "Invoice" : "Quote"}</h2><p>${esc(d.number)}</p></div></header>
       <section class="bz-pmeta">
@@ -1397,9 +1403,9 @@
     const L = 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
     return (1.05) / (L + 0.05) >= (L + 0.05) / 0.05 ? "#FFFFFF" : "#0E0E0E";
   }
-  function miniHeader(name, logo, color) {
-    const a = color || "#C6F432";
-    return `<div class="bz-minipaper"><div class="bz-row bz-gap">${logo ? `<img src="${esc(logo)}" alt="">` : ""}<b>${esc(name)}</b><span class="bz-grow"></span><small>INVOICE</small></div>
+  function miniHeader(name, logo, color, scale) {
+    const a = color || "#C6F432", s = Number(scale) || 1;
+    return `<div class="bz-minipaper"><div class="bz-row bz-gap">${logo ? `<img src="${esc(logo)}" alt="" style="height:${Math.round(26 * s)}px;max-width:${Math.round(80 * s)}px">` : ""}<b>${esc(name)}</b><span class="bz-grow"></span><small>INVOICE</small></div>
       <i style="background:${a}"></i><div class="bz-row"><small>Amount due</small><span class="bz-minidue" style="background:${a};color:${inkOn(a)}">₦480,000</span></div></div>`;
   }
   function loadImg(src) { return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("That file isn't an image Egom can read. Try a PNG or JPG.")); im.src = src; }); }
@@ -1408,14 +1414,32 @@
   async function shrinkLogo(file) {
     if (file.size > 8e6) throw new Error("That image is too large. Use one under 8 MB.");
     const im = await loadImg(await readAsDataURL(file));
-    const w0 = im.naturalWidth || 600, h0 = im.naturalHeight || 240;
+    const crop = trimBox(im), w0 = crop.w, h0 = crop.h;
     for (const max of [[600, 240], [420, 170], [300, 120]]) {
       const k = Math.min(1, max[0] / w0, max[1] / h0), w = Math.max(1, Math.round(w0 * k)), h = Math.max(1, Math.round(h0 * k));
       const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
-      cv.getContext("2d").drawImage(im, 0, 0, w, h);
+      cv.getContext("2d").drawImage(crop.src, crop.x, crop.y, crop.w, crop.h, 0, 0, w, h);
       for (const out of [cv.toDataURL("image/png"), cv.toDataURL("image/webp", 0.92)]) if (out.length <= 380000 && out.startsWith("data:image/")) return out;
     }
     throw new Error("Couldn't make that logo small enough. Try a simpler image.");
+  }
+  // Cut away empty space around the logo (see-through, or plain white when the image has no see-through parts),
+  // so the logo itself fills the space it's given. Works on a copy at most 1600 px wide.
+  function trimBox(im) {
+    const W = im.naturalWidth || 600, H = im.naturalHeight || 240, k = Math.min(1, 1600 / W, 1600 / H);
+    const w = Math.max(1, Math.round(W * k)), h = Math.max(1, Math.round(H * k));
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+    const c = cv.getContext("2d"); c.drawImage(im, 0, 0, w, h);
+    let d; try { d = c.getImageData(0, 0, w, h).data; } catch (e) { return { src: cv, x: 0, y: 0, w, h }; }
+    let clear = 0; for (let i = 3; i < d.length; i += 16) if (d[i] < 16) clear++;
+    const usesAlpha = clear > d.length / 16 * 0.02;
+    const blank = (i) => d[i + 3] < 16 || (!usesAlpha && d[i] > 242 && d[i + 1] > 242 && d[i + 2] > 242);
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (!blank((y * w + x) * 4)) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) return { src: cv, x: 0, y: 0, w, h };
+    const pad = Math.round(Math.max(x1 - x0, y1 - y0) * 0.02);
+    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w - 1, x1 + pad); y1 = Math.min(h - 1, y1 + pad);
+    return { src: cv, x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
   }
   // The most common strong colour in the logo (ignores white, black, greys and see-through pixels).
   async function logoColour(src) {
