@@ -656,6 +656,7 @@ html,body{background:var(--bg)}
   .tabbar button.on{background:rgba(198,244,50,.12);color:#C6F432}
   .tabbar .ico.g{width:20px;height:20px}
   .tabbar button:nth-of-type(1){margin-top:64px}
+  body.bz-on .tabbar .bz-tab[data-bt="home"]{margin-top:64px}
   .tabbar{align-items:stretch;justify-content:flex-start}
   .fab{left:30px;right:auto;top:108px;bottom:auto;width:204px;height:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:15px;font-weight:600}
   .fab .ico{width:20px;height:20px}
@@ -820,6 +821,25 @@ html,body{background:var(--bg)}
 .secret-row code{font-size:13px;letter-spacing:.04em;word-break:break-all;color:var(--ink)}
 .sheet .auth-form input{background:var(--bg)!important}
 #auth .fine .linkbtn,#auth .fine.center .linkbtn,#mfaOut{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+
+/* Business Expenses calendar: invoices falling due */
+.cal .d{position:relative}
+.duedot{position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:#FFBE3D;box-shadow:0 0 0 2px var(--surface,#fff)}
+.duedot.late{background:#FF7A6B}
+.tx.due{width:100%;border:0;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+/* Business has five tabs (phone bar only; the laptop sidebar lists them) */
+@media (max-width:1023px){
+  body.bz-on .tabbar{grid-template-columns:repeat(5,minmax(0,1fr));padding:0 4px}
+  body.bz-on .tabbar button{font-size:10.5px}
+}
+/* petty cash shortcut on Accounts */
+.pettyrow{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 10px;padding:12px 16px;border:1.5px dashed var(--line);border-radius:24px;background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.pettyrow .accmid{flex:1;min-width:0}
+.pettyrow .accmid small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.pettyrow > .ico{width:18px;height:18px;color:var(--muted)}
+.pettyrow .accmono .ico{width:20px;height:20px}
+.pettyic{background:var(--accent);color:var(--on-lime)}
+.sheet .btn .ico{width:16px;height:16px;margin-right:4px;vertical-align:-3px}
 </style>
 </head>
 <body><div id="blobs" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i></div>
@@ -1444,6 +1464,7 @@ ICON["Salary"] = "💼"; ICON["Sales & Customer Payments"] = "🧾"; ICON["Gifts
 
 /* ============ Egom line icons (2px stroke, round ends) ============ */
 const IC = {
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>', chev: '<path d="m9 6 6 6-6 6"/>',
   in: '<path d="M17 7 7 17"/><path d="M7 9v8h8"/>', out: '<path d="M7 17 17 7"/><path d="M9 7h8v8"/>',
   receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
@@ -1590,8 +1611,58 @@ function render() {
     $("ledgerSeg").querySelectorAll("button").forEach((b) => b.onclick = () => { if (ledger === b.dataset.l) return; ledger = b.dataset.l; catFilter = null; selDay = null; catSel = null; saveUi(); render(); });
   }
   { const [y0, m0] = ym.split("-").map(Number); $("monthLbl").textContent = new Date(y0, m0 - 1, 1).toLocaleDateString("en-GB", { month: y0 === now.getFullYear() ? "long" : "short" }) + (y0 !== now.getFullYear() ? " " + y0 : ""); }
+  // Business side: its own app (business.js), loaded the first time someone opens it
+  if (hasBiz() && ledger === "business") {
+    shareEgom();
+    if (window.EgomBusiness) return window.EgomBusiness.render();
+    $("view").innerHTML = `<div class="bz-empty" style="padding:40px 16px;text-align:center;color:var(--muted)">Opening your business books…</div>`;
+    loadBusiness().then(() => { if (ledger === "business") render(); })
+      .catch((e) => { $("view").innerHTML = `<div style="padding:40px 16px;text-align:center;color:var(--muted)">${esc(e.message)}<br><button class="btn" id="bizRetry" style="margin-top:12px">Try again</button></div>`; $("bizRetry").onclick = () => render(); });
+    return;
+  }
+  if (window.EgomBusiness) window.EgomBusiness.leave();
   document.querySelectorAll("#tabbar button").forEach((b) => b.classList.toggle("on", b.dataset.t === tab));
   ({ home: renderHome, accounts: renderAccounts, tx: renderTx, budget: renderBudget })[tab]();
+}
+
+/* ============ Egom Business (business.js): invoices, quotes, customers, reports ============ */
+const BIZ_VERSION = "7";   // raise with every business.js update so phones fetch the new copy
+let bizLoading = null;
+function loadBusiness() {
+  if (window.EgomBusiness) return Promise.resolve(window.EgomBusiness);
+  if (!bizLoading) bizLoading = new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "business.js?v=" + BIZ_VERSION;
+    s.onload = () => window.EgomBusiness ? res(window.EgomBusiness) : rej(new Error("Couldn't open Business."));
+    s.onerror = () => { bizLoading = null; s.remove(); rej(new Error("Couldn't open Business. Check your connection and try again.")); };
+    document.head.appendChild(s);
+  });
+  return bizLoading;
+}
+// What business.js borrows from the main app
+function shareEgom() {
+  if (window.EGOM && window.EGOM._egom) return;
+  window.EGOM = {
+    _egom: true,
+    get sb() { return sb || (demo && window.MockEgom ? window.MockEgom.sb : null); },
+    get ym() { return ym; },
+    get preview() { return !!demo; },
+    toast, icon,
+    reload: () => load(),
+    openAdd: () => openAdd(),
+    accountNames: () => accountNames(),
+    renderExpenses: () => renderTx(),
+    renderBanks: () => renderAccounts(),
+    heroSpark: () => profitSpark(),
+    categories: () => CATEGORIES.business,
+    bankSummary: () => {
+      const names = accountNames(), known = names.map((n) => [n, accountBalance(n)]).filter(([, v]) => v !== null);
+      const isCash = (n) => /cash/i.test(n);
+      const sum = (f) => known.filter(([n]) => f(n)).reduce((t, [, v]) => t + v, 0);
+      return { names: names.length, known: known.length, total: sum(() => true), cash: sum(isCash), bank: sum((n) => !isCash(n)) };
+    },
+    shareBase: location.origin + "/",
+  };
 }
 function banner(t) { $("banner").textContent = t; $("banner").classList.remove("hidden"); }
 function catTotals(list) {
@@ -1611,6 +1682,21 @@ function ring(pct, col, size = 34) {
   const r = size / 2 - 4, C = 2 * Math.PI * r, over = pct > 100;
   return `<svg class="ring2" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" style="stroke:var(--track)" stroke-width="4"/>
     <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" style="stroke:${over ? "var(--exp)" : col}" stroke-width="4" stroke-linecap="round" stroke-dasharray="${C * Math.min(100, pct) / 100} ${C}" transform="rotate(-90 ${size / 2} ${size / 2})"/></svg>`;
+}
+// Business hero: profit building up through the month (money in minus money out, day by day)
+function profitSpark() {
+  const [y, m] = ym.split("-").map(Number), days = new Date(y, m, 0).getDate();
+  const cur = monthRows(ym), v = Array(days).fill(0);
+  incomes(cur).forEach((r) => { v[+r.tx_date.slice(8, 10) - 1] += Number(r.amount) || 0; });
+  expenses(cur).forEach((r) => { v[+r.tx_date.slice(8, 10) - 1] -= spend(r); });
+  if (!v.some(Boolean)) return "";
+  let acc = 0; const cum = v.map((x) => (acc += x));
+  const last = ym === ymNow() ? now.getDate() : days, shown = cum.slice(0, last);
+  const hi = Math.max(0, ...shown), lo = Math.min(0, ...shown), span = Math.max(1, hi - lo);
+  const Y = (c) => 66 - ((c - lo) / span) * 60, X = (i) => (i / (days - 1)) * 200;
+  const pts = shown.map((c, i) => `${X(i)},${Y(c)}`).join(" ");
+  const zero = lo < 0 ? `<line x1="0" x2="200" y1="${Y(0)}" y2="${Y(0)}" stroke="rgba(255,255,255,.18)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "";
+  return `<svg viewBox="0 0 200 70" preserveAspectRatio="none" aria-hidden="true">${zero}<polyline points="${pts}" fill="none" style="stroke:var(--chart)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
 }
 function sparkline(exp) {
   const [y, m] = ym.split("-").map(Number), days = new Date(y, m, 0).getDate();
@@ -1903,7 +1989,16 @@ function renderTx() {
   $("view").querySelectorAll(".seg [data-m]").forEach((b) => b.onclick = () => { txMode = b.dataset.m; renderTx(); });
   if (txMode === "record") wireRecord(); else wireStats(exp);
 }
+// Business side: invoices falling due show on the Expenses calendar too
+const calExtras = () => (ledger === "business" && window.EgomBusiness && window.EgomBusiness.calendarExtras ? window.EgomBusiness.calendarExtras(ym) : []);
+function dueRow(x) {
+  return `<button type="button" class="tx due" data-due="${x.id}"><div class="ic" style="background:color-mix(in srgb, ${x.late ? "#FF7A6B" : "#FFBE3D"} 22%, transparent);color:${x.late ? "var(--exp)" : "#C98A00"}">${icon("calendar")}</div>
+    <div class="mid"><div class="t1">${esc(x.title)}</div><div class="t2">${esc(x.sub)}</div></div>
+    <div class="rt"><b class="${x.late ? "exp" : ""}">${money(x.kobo / 100)}</b><small>${x.kind === "bill" ? "to pay" : "to collect"}</small></div></button>`;
+}
 function recordView(cur, exp, inc) {
+  const extras = calExtras(), dueOn = {};
+  extras.forEach((x) => { const d = +x.date.slice(8, 10); (dueOn[d] = dueOn[d] || []).push(x); });
   const [y, m] = ym.split("-").map(Number);
   const first = new Date(y, m - 1, 1), days = new Date(y, m, 0).getDate();
   const lead = (first.getDay() + 6) % 7; // Monday first
@@ -1915,7 +2010,7 @@ function recordView(cur, exp, inc) {
   for (let d = 1; d <= days; d++) {
     const isToday = ym === ymNow() && d === now.getDate();
     const heat = perDay[d] ? 0.1 + 0.45 * Math.sqrt(perDay[d] / maxDay) : 0;
-    cells += `<button class="d ${isToday ? "today" : ""} ${selDay === d ? "sel" : ""}" data-d="${d}" style="${heat ? `background:color-mix(in srgb, var(--chart) ${Math.round(heat * 30)}%, transparent)` : ""}"><span class="n">${d}</span><span class="a">${perDay[d] ? short(perDay[d]) : ""}</span></button>`;
+    cells += `<button class="d ${isToday ? "today" : ""} ${selDay === d ? "sel" : ""}" data-d="${d}" style="${heat ? `background:color-mix(in srgb, var(--chart) ${Math.round(heat * 30)}%, transparent)` : ""}"><span class="n">${d}</span><span class="a">${perDay[d] ? short(perDay[d]) : ""}</span>${dueOn[d] ? `<i class="duedot ${dueOn[d].some((x) => x.late) ? "late" : ""}" title="Something due"></i>` : ""}</button>`;
   }
   const tail = (7 - ((lead + days) % 7)) % 7;
   for (let i = 1; i <= tail; i++) cells += `<div class="d out"><span class="n">${i}</span></div>`;
@@ -1924,18 +2019,24 @@ function recordView(cur, exp, inc) {
   if (selDay) list = list.filter((r) => +r.tx_date.slice(8, 10) === selDay);
   if (catFilter) list = list.filter((r) => r.category === catFilter);
   const byDay = new Map();
+  const dueList = catFilter ? [] : extras.filter((x) => !selDay || +x.date.slice(8, 10) === selDay);
+  dueList.forEach((x) => { if (!byDay.has(x.date)) byDay.set(x.date, []); });
   list.sort((a, b) => (b.tx_date + (b.tx_time || "")).localeCompare(a.tx_date + (a.tx_time || ""))).forEach((r) => { if (!byDay.has(r.tx_date)) byDay.set(r.tx_date, []); byDay.get(r.tx_date).push(r); });
-  const groups = [...byDay.entries()].map(([d, rs]) => {
+  const groups = [...byDay.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([d, rs]) => {
     const [yy, mm, dd] = d.split("-").map(Number);
     const lbl = new Date(yy, mm - 1, dd).toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" });
     const out = sum(expenses(rs));
-    return `<div class="day"><div class="hd"><span>${lbl}</span><span>${out ? `<em>OUT</em>${money(out)}` : ""}</span></div>${rs.map(txRow).join("")}</div>`;
+    const due = dueList.filter((x) => x.date === d);
+    return `<div class="day"><div class="hd"><span>${lbl}</span><span>${out ? `<em>OUT</em>${money(out)}` : ""}</span></div>${due.map(dueRow).join("")}${rs.map(txRow).join("")}</div>`;
   }).join("");
   const filterNote = (selDay || catFilter) ? `<div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 10px;font-size:13px;color:var(--ink-2)"><span>Showing ${[catFilter, selDay && selDay + " " + monthTitle(ym)].filter(Boolean).map(esc).join(" · ")}</span><button class="btn" id="clearF" style="padding:6px 12px">Show all</button></div>` : "";
   return `<div class="txcols"><div class="txside"><div class="card"><div class="cal">${cells}</div>
       <div class="kv totals" style="margin-top:16px"><div><div class="l">Income</div><div class="v inc">${money(ti)}</div></div>
       <div style="text-align:center"><div class="l">Expense</div><div class="v exp">${money(te)}</div></div>
       <div style="text-align:right"><div class="l">Balance</div><div class="v">${money(ti - te)}</div></div></div>
+      ${(() => { const inv = extras.filter((x) => x.kind !== "bill"), bills = extras.filter((x) => x.kind === "bill"), sum = (l) => money(l.reduce((t, x) => t + x.kobo, 0) / 100);
+        return (inv.length ? `<div class="gs" style="display:flex;align-items:center;gap:6px;margin-top:10px"><i class="duedot" style="position:static"></i>Invoice due · ${inv.length} this month, ${sum(inv)} to collect</div>` : "")
+          + (bills.length ? `<div class="gs" style="display:flex;align-items:center;gap:6px;margin-top:6px"><i class="duedot" style="position:static"></i>Bill due · ${bills.length} this month, ${sum(bills)} to pay</div>` : ""); })()}
       ${dayBar(y, m)}</div></div>
     <div class="txmain">${filterNote}${groups || `<div class="empty">No transactions${selDay ? " on this day" : ""}.</div>`}</div></div>`;
 }
@@ -1960,7 +2061,7 @@ function dayBar(y, m) {
 function wireRecord() {
   $("view").querySelectorAll(".cal [data-d]").forEach((b) => b.onclick = () => { const d = +b.dataset.d; selDay = selDay === d ? null : d; renderTx(); });
   if ($("dayAdd")) $("dayAdd").onclick = () => openRecord($("dayAdd").dataset.iso);
-  $("view").querySelectorAll(".tx").forEach((el) => el.onclick = () => openTx(el.dataset.id));
+  $("view").querySelectorAll(".tx").forEach((el) => el.onclick = () => el.dataset.due ? window.EgomBusiness.openDoc(el.dataset.due) : openTx(el.dataset.id));
   const c = $("clearF"); if (c) c.onclick = () => { selDay = null; catFilter = null; renderTx(); };
 }
 function statsView(cur, exp, inc) {
@@ -2060,6 +2161,7 @@ function renderAccounts() {
   const names = accountNames(), cur = monthRows(ym);
   const known = names.map((n) => [n, accountBalance(n)]).filter(([, v]) => v !== null);
   const total = known.reduce((t, [, v]) => t + v, 0);
+  const petty = names.find((n) => /petty/i.test(n));
   const monthIO = (n) => cur.reduce((o, r) => { const e = effect(r, n); if (e > 0) o.inn += e; else o.out -= e; return o; }, { inn: 0, out: 0 });
   $("view").innerHTML = `
     <section class="g-hero">
@@ -2069,6 +2171,8 @@ function renderAccounts() {
       <button type="button" class="heromove" id="heroMove">${icon("swap")}Move between accounts</button>
     </section>
     <div class="ghead"><h3>Accounts</h3><button type="button" class="linkbtn" id="accAdd">+ Add account</button></div>
+    ${petty ? `<button type="button" class="pettyrow" id="pettyTop"><span class="accmono" style="background:${accColor(petty)}">${icon("cash")}</span><span class="accmid"><b>Top up ${esc(petty)}</b><small>Move money from a bank into the cash box</small></span>${icon("chev")}</button>`
+      : `<button type="button" class="pettyrow" id="pettyAdd"><span class="accmono pettyic">${icon("cash")}</span><span class="accmid"><b>Add petty cash</b><small>Track the cash box for small daily spending</small></span>${icon("plus")}</button>`}
     ${names.length ? `<div class="acclist">${names.map((n) => { const v = accountBalance(n), io = monthIO(n); return `
       <button class="accrow" data-acc="${esc(n)}">
         <span class="accmono" style="background:${accColor(n)}">${mono(n)}</span>
@@ -2080,17 +2184,19 @@ function renderAccounts() {
   $("heroMove").onclick = () => openMove("transfer");
   $("view").querySelectorAll("[data-acc]").forEach((b) => b.onclick = () => openAccount(b.dataset.acc));
   $("accAdd").onclick = () => openAccountForm();
+  if ($("pettyAdd")) $("pettyAdd").onclick = () => openAccountForm("", "Petty cash");
+  if ($("pettyTop")) $("pettyTop").onclick = () => openMove("transfer", names.find((n) => n !== petty && !/^cash$/i.test(n)) || "", petty);
 }
 
 async function saveAccounts(list) { await saveHomePrefs({ ...homePrefs(), accounts: { ...(homePrefs().accounts || {}), [ledger]: list } }); }
-function openAccountForm(name = "") {
+function openAccountForm(name = "", preset = "") {
   const a = savedAccounts().find((x) => bankKey(x.name) === name), v = name ? accountBalance(name) : null;
-  const close = sheet("af", name ? esc(name) : "Add an account", `
-    ${name ? "" : `<label for="afName">Bank or wallet</label><input id="afName" list="bankList2" placeholder="e.g. Moniepoint, GTBank, Cash" autocomplete="off">
+  const close = sheet("af", name ? esc(name) : preset ? "Add " + esc(preset.toLowerCase()) : "Add an account", `
+    ${name ? "" : `<label for="afName">${preset ? "Name" : "Bank or wallet"}</label><input id="afName" list="bankList2" placeholder="e.g. Moniepoint, GTBank, Cash" autocomplete="off" value="${esc(preset)}">
     <datalist id="bankList2">${[...Object.keys(BANK_STYLE), "Cash"].map((b) => `<option value="${esc(b)}">`).join("")}</datalist>`}
     <label for="afBal">Balance right now</label>
     <div class="budwrap"><span>₦</span><input id="afBal" inputmode="decimal" placeholder="e.g. 250000" value="${v !== null ? Math.round(v).toLocaleString("en-NG") : ""}"></div>
-    <p class="fine">Check your bank app and type what it shows. From now on Egom adds and takes away as money moves.</p>
+    <p class="fine">${preset ? "Count the cash in the box and type it. Then pick it as “Paid from” when you record small spending, and top it up from a bank when it runs low." : "Check your bank app and type what it shows. From now on Egom adds and takes away as money moves."}</p>
     <button class="btn primary" id="afSave" style="width:100%;margin-top:14px">${name ? "Update balance" : "Add account"}</button>
     ${a ? `<button class="btn ghost" id="afRemove" style="width:100%;margin-top:6px">Stop tracking this balance</button>` : ""}`);
   $("afSave").onclick = async () => {
@@ -2120,22 +2226,23 @@ function openAccount(name) {
 const prettyDay = (d) => { if (!d) return ""; const x = new Date(d + "T12:00:00"); return x.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); };
 
 /* ---- add a record for a chosen date (from the Activity calendar) ---- */
-function openRecord(iso, kind = "expense") {
+function openRecord(iso, kind = "expense", pre = null) {
   if (kind === "income") return openIncome({ date: iso });
-  let sp = hasBiz() && ledger !== "all" ? ledger : "personal";
+  let sp = pre && pre.sp && (pre.sp === "personal" || hasBiz()) ? pre.sp : hasBiz() && ledger !== "all" ? ledger : "personal";
   const lbl = new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-  const catOpts = () => CATEGORIES[sp].map((c) => `<option ${c === "Other" ? "selected" : ""}>${esc(c)}</option>`).join("");
-  const close = sheet("rc", "Add a record", `
+  const pick = () => (pre && pre.cat && CATEGORIES[sp].includes(pre.cat) ? pre.cat : "Other");
+  const catOpts = () => CATEGORIES[sp].map((c) => `<option ${c === pick() ? "selected" : ""}>${esc(c)}</option>`).join("");
+  const close = sheet("rc", pre ? "Copy this record" : "Add a record", `
     <p class="gs" style="margin:2px 0 8px">${esc(lbl)}</p>
     <div class="toggle wide"><button type="button" class="on">Money out</button><button type="button" id="rcIn">Money in</button></div>
     <label for="rcAmt">Amount</label>
-    <div class="budwrap"><span>₦</span><input id="rcAmt" inputmode="decimal" placeholder="0" autocomplete="off"></div>
-    <label for="rcTo">Paid to</label><input id="rcTo" placeholder="e.g. Shoprite, mechanic, IKEDC" autocomplete="off">
+    <div class="budwrap"><span>₦</span><input id="rcAmt" inputmode="decimal" placeholder="0" autocomplete="off" value="${pre && pre.amount ? esc(String(pre.amount)) : ""}"></div>
+    <label for="rcTo">Paid to</label><input id="rcTo" placeholder="e.g. Shoprite, mechanic, IKEDC" autocomplete="off" value="${esc((pre && pre.to) || "")}">
     ${hasBiz() ? `<label>Ledger</label><div class="toggle wide" id="rcSp">${["personal", "business"].map((x) => `<button type="button" data-sp="${x}" class="${x === sp ? "on" : ""}">${esc(spaceLabel(x))}</button>`).join("")}</div>` : ""}
     <label for="rcCat">Category</label><select id="rcCat">${catOpts()}</select>
-    <label for="rcAcc">Paid from <span class="opt">optional</span></label><input id="rcAcc" list="rcAccL" placeholder="Bank, wallet or Cash" autocomplete="off">
+    <label for="rcAcc">Paid from <span class="opt">optional</span></label><input id="rcAcc" list="rcAccL" placeholder="Bank, wallet or Cash" autocomplete="off" value="${esc((pre && pre.acc) || "")}">
     <datalist id="rcAccL">${[...new Set([...accountNames(), ...Object.keys(BANK_STYLE), "Cash"])].map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
-    <label for="rcNote">Note <span class="opt">optional</span></label><input id="rcNote" placeholder="What was it for?" autocomplete="off">
+    <label for="rcNote">Note <span class="opt">optional</span></label><input id="rcNote" placeholder="What was it for?" autocomplete="off" value="${esc((pre && pre.note) || "")}">
     <label for="rcDate">Date</label><input id="rcDate" type="date" value="${iso}" max="${todayISO()}">
     <button class="btn primary" id="rcSave" style="width:100%;margin-top:14px">Save record</button>`);
   setTimeout(() => $("rcAmt") && $("rcAmt").focus(), 50);
@@ -2167,7 +2274,7 @@ async function saveRows(list) {
   if (error) return error.message;
   rows.push(...data); return null;
 }
-function openMove(kind, account = "") {
+function openMove(kind, account = "", toAcc = "") {
   const names = accountNames();
   const sp = budgetSpace(), cats = CATEGORIES[sp] || [];
   const billCat = cats.find((c) => /bill|utilit/i.test(c)) || cats[0];
@@ -2185,7 +2292,7 @@ function openMove(kind, account = "") {
       <label for="mvTo">Paid to</label><input id="mvTo" placeholder="e.g. IKEDC, DSTV">
       <label for="mvCat">Category</label><select id="mvCat">${cats.map((c) => `<option ${c === billCat ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
       ${accSel("mvAcc", "Paid from", account || names[0])}` : ""}
-    ${kind === "transfer" ? `${accSel("mvAcc", "From", account || names[0])}${accSel("mvTo2", "To", names.find((n) => n !== (account || names[0])) || "Cash", ["Cash"])}<p class="fine">Already moved it in your bank app? Note it here so both balances stay right. Use "Cash" for a withdrawal. It isn't spending, so your budgets don't change.</p>` : ""}
+    ${kind === "transfer" ? `${accSel("mvAcc", "From", account || names[0])}${accSel("mvTo2", "To", toAcc || names.find((n) => n !== (account || names[0])) || "Cash", ["Cash"])}<p class="fine">Already moved it in your bank app? Note it here so both balances stay right. Use "Cash" for a withdrawal. It isn't spending, so your budgets don't change.</p>` : ""}
     ${kind !== "add" ? `<label for="mvFee">Bank charge <span class="opt">optional</span></label><div class="budwrap"><span>₦</span><input id="mvFee" inputmode="decimal" placeholder="0"></div>` : ""}
     <label for="mvDate">Date</label><input id="mvDate" type="date" value="${todayISO()}" max="${todayISO()}">
     <button class="btn primary" id="mvSave" style="width:100%;margin-top:14px">Save note</button>`);
@@ -2299,7 +2406,7 @@ function openTx(id) {
     <div class="${hasBiz() ? "" : "hidden"}"><label>Ledger</label><select id="eSp"><option value="personal" ${r.space === "personal" ? "selected" : ""}>Personal</option><option value="business" ${r.space === "business" ? "selected" : ""}>${esc(bizName())}</option></select></div>
     <label>Type</label><select id="eKind"><option value="expense" ${r.kind === "expense" ? "selected" : ""}>Expense</option><option value="income" ${r.kind === "income" ? "selected" : ""}>Money in</option><option value="transfer" ${r.kind === "transfer" ? "selected" : ""}>Own transfer (not spending)</option></select>
     <label>Note</label><input id="eNote" value="${esc(r.note || "")}" placeholder="e.g. Lekki job">
-    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn danger" id="eDel">Delete</button><div style="flex:1"></div><button class="btn primary" id="eSave">Save</button></div>
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn danger" id="eDel">Delete</button><div style="flex:1"></div>${r.kind === "expense" ? `<button class="btn" id="eCopy" title="Add the same spending again, dated today">${icon("copy")}Copy</button>` : ""}<button class="btn primary" id="eSave">Save</button></div>
   </div></div>`;
   const close = () => $("sheetRoot").innerHTML = "";
   $("sx").onclick = close; $("sbg").onclick = (e) => { if (e.target.id === "sbg") close(); };
@@ -2310,6 +2417,7 @@ function openTx(id) {
     $("eCat").innerHTML = cs.map((c) => `<option ${c === guess ? "selected" : ""}>${esc(c)}</option>`).join("");
   };
   $("eSp").onchange = refreshCats; $("eKind").onchange = refreshCats;
+  if ($("eCopy")) $("eCopy").onclick = () => { close(); openRecord(todayISO(), "expense", { amount: Number(r.amount) || "", to: r.counterparty || "", sp: r.space, cat: r.category, acc: r.bank || "", note: r.note || "" }); };
   let armed = false;
   $("eDel").onclick = () => { if (!armed) { armed = true; $("eDel").textContent = "Tap again to delete"; return; } close(); deleteRow(id); };
   $("eSave").onclick = () => { const patch = {}; if ($("eCat").value !== r.category) patch.category = $("eCat").value; if ($("eSp").value !== r.space) patch.space = $("eSp").value; if ($("eKind").value !== r.kind) patch.kind = $("eKind").value; if ($("eNote").value.trim() !== (r.note || "")) patch.note = $("eNote").value.trim() || null; close(); if (Object.keys(patch).length) updateRow(id, patch); };
@@ -2326,7 +2434,7 @@ window.addEventListener("resize", () => { clearTimeout(window.__r); window.__r =
 const fmtPhone = (d) => { d = String(d || "").replace(/\D/g, ""); return d.length === 13 ? `+${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)} ${d.slice(9)}` : "+" + d; };
 const BOT_DISPLAY = fmtPhone(BOT_NUMBER);
 const waLink = (code) => `https://wa.me/${BOT_NUMBER}?text=${encodeURIComponent("LINK " + code)}`;
-const DEMO_PROFILE = { user_id: "demo", email: "you@example.com", full_name: "Ada Obi", has_business: true, business_name: "Brightline Solar", business_preset: "solar", whatsapp: null, onboarded: true,
+const DEMO_PROFILE = { user_id: "demo", email: "you@example.com", full_name: "Ada Obi", has_business: true, business_name: "Bright Homes Ltd", business_preset: "building", whatsapp: null, onboarded: true,
   home_prefs: { accounts: {
     personal: [{ name: "Kuda", balance: 310000, as_of: "2000-01-01T00:00:00Z" }, { name: "GTBank", balance: 540000, as_of: "2000-01-01T00:00:00Z" }],
     business: [{ name: "Moniepoint", balance: 4200000, as_of: "2000-01-01T00:00:00Z" }, { name: "Access", balance: 1350000, as_of: "2000-01-01T00:00:00Z" }, { name: "OPay", balance: 640000, as_of: "2000-01-01T00:00:00Z" }],
@@ -2747,6 +2855,14 @@ async function start() {
     return screenEmail();
   }
   sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, detectSessionInUrl: true } });
+  // A customer opening an invoice or quote link: show just that document, no sign-in
+  const docToken = new URLSearchParams(location.search).get("doc");
+  if (docToken) {
+    shareEgom();
+    try { (await loadBusiness()).showShared(docToken); }
+    catch (e) { $("auth") && $("auth").classList.add("hidden"); document.body.insertAdjacentHTML("beforeend", `<p style="padding:40px;text-align:center">${esc(e.message)}</p>`); }
+    return;
+  }
   registerSW();
   sb.auth.onAuthStateChange((event, s) => {
     // Someone tapped the link in the email instead of typing the code
@@ -3284,7 +3400,7 @@ function demoRows() {
     add(d(mo, 20), "23:27", "personal", 5000, "Health", "Gym", "gym", "OPay");
     add(d(mo, 21), "20:10", "personal", 40000, "Family & Support", "Mum", "upkeep", "GTBank", 25);
     add(d(mo, 27), "10:30", "personal", 12000, "Bills & Utilities", "IKEDC", "prepaid meter", "OPay", 10);
-    add(d(mo, 26), "10:00", "personal", 150000, "Other", "Brightline Solar Ltd", "salary", "Access", 0, "income");
+    add(d(mo, 26), "10:00", "personal", 150000, "Other", "Bright Homes Ltd", "salary", "Access", 0, "income");
   }
   const today = d(0, now.getDate());
   return out.filter((r) => r.tx_date <= today);
