@@ -2547,6 +2547,7 @@ function screenEmail() {
       <div class="or-row"><span>or</span></div>
       <button class="btn big" id="emailGo" type="button">Email me a code</button>
       <p class="fine">New to Egom? Tap <b>Email me a code</b> to create your free account. You can add a password later. <button type="button" class="linkbtn" id="forgotPw">Forgot password?</button></p>
+      <p class="fine" style="margin-top:6px">By continuing you agree to how we handle your information in our <a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a>.</p>
     </form>
     ${demo ? `<p class="fine" style="text-align:center"><a href="#" id="demoSkip">Skip to the sample dashboard</a></p>` : ""}`);
   const readEmail = () => {
@@ -2883,6 +2884,7 @@ function openSettings() {
     <button class="btn" id="sCats" style="width:100%;margin-top:10px">Categories</button>
     <button class="btn" id="sRefresh" style="width:100%;margin-top:10px">Refresh data</button>
     <button class="btn danger" id="sOut" style="width:100%;margin-top:18px">Sign out</button>
+    <p class="fine" style="text-align:center;margin-top:14px"><a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a> · <a href="mailto:support@egom.ng">support@egom.ng</a></p>
   </div></div>`;
   const close = () => ($("sheetRoot").innerHTML = "");
   $("sx").onclick = close; $("sbg").onclick = (e) => { if (e.target.id === "sbg") close(); };
