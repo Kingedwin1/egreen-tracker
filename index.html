@@ -3081,6 +3081,8 @@ async function openMfaSetup() {
     const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "Egom " + new Date().toISOString().slice(0, 10), issuer: "Egom" });
     if (error) return toast("Couldn't start: " + error.message);
     factorId = data.id; qr = data.totp.qr_code; secret = data.totp.secret;
+    // Supabase may hand back the QR as raw SVG markup instead of an image address; turn it into one
+    if (qr && !/^data:/.test(qr)) qr = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(qr.trim());
   } else {
     qr = "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#fff"/><path d="M1 1h3v3H1zM6 1h3v3H6zM1 6h3v3H1zM6 6h1v1H6zM8 8h1v1H8z" fill="#000"/></svg>`);
   }
@@ -3089,7 +3091,7 @@ async function openMfaSetup() {
   const close = sheet("mfa", "Turn on two-step verification", `
     <p class="fine" style="margin-top:0"><b>1.</b> Install an authenticator app if you don't have one: Google Authenticator, Microsoft Authenticator or 1Password.</p>
     <p class="fine"><b>2.</b> In the app, add an account and scan this code. ${isIOS() || /android/i.test(navigator.userAgent) ? `On this phone, <a href="${uri}" id="mfaOpen">tap here to add it</a> or type the key below instead.` : ""}</p>
-    <div class="qrbox"><img src="${qr}" alt="QR code for your authenticator app" width="180" height="180"></div>
+    <div class="qrbox"><img src="${esc(qr)}" alt="QR code for your authenticator app" width="180" height="180"></div>
     <div class="secret-row"><code id="mfaSecret">${secret.replace(/(.{4})/g, "$1 ").trim()}</code><button class="btn" id="mfaCopy" type="button">Copy key</button></div>
     <p class="fine"><b>3.</b> Type the 6-digit code the app shows for Egom.</p>
     <form id="mfaSetForm" class="auth-form">
