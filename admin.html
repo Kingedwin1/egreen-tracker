@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Egom admin</title>
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#F2F3EE;--card:#FFFFFF;--ink:#14161A;--ink2:#3A3F45;--muted:#6B7177;--line:rgba(20,22,26,.09);--raise:rgba(20,22,26,.045);
+    --lime:#C6F432;--limeink:#4C6B00;--bar:#14161A;--bar2:#9BBF1F;--track:rgba(20,22,26,.07);--amber:#B07800;--red:#C2412D;--good:#2F7D32;
+    --display:"Space Grotesk",Inter,system-ui,sans-serif;--sans:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  @media (prefers-color-scheme: dark){:root{--bg:#0E0F11;--card:#17191C;--ink:#F2F3EE;--ink2:#CDD1D5;--muted:#9AA0A6;--line:rgba(255,255,255,.09);--raise:rgba(255,255,255,.05);
+    --limeink:#C6F432;--bar:#C6F432;--bar2:#7E9A2A;--track:rgba(255,255,255,.08);--amber:#F2B53A;--red:#FF8A78;--good:#7BD389}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+  button,input{font:inherit;color:inherit}
+  .wrap{max-width:1240px;margin:0 auto;padding:20px 18px 60px}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  .logo{display:flex;align-items:center;gap:10px;font:700 21px/1 var(--display);letter-spacing:-.02em;color:var(--ink);text-decoration:none}
+  .logo i{display:block;width:24px;height:8px;border-radius:8px;background:var(--lime);box-shadow:0 11px 0 -1px var(--ink)}
+  .logo span{margin-bottom:-4px}
+  .tag{font:600 11px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;padding:6px 9px;border-radius:99px;background:var(--ink);color:var(--bg)}
+  .grow{flex:1}
+  .asof{color:var(--muted);font-size:13px}
+  .btn{height:38px;padding:0 15px;border-radius:99px;border:1px solid var(--line);background:var(--card);font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:var(--ink)}
+  .btn:hover{background:var(--raise)}
+  .btn.primary{background:var(--lime);border-color:transparent;color:#14161A}
+  .warn{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:16px;background:color-mix(in srgb,var(--amber) 14%,transparent);color:var(--ink);margin-bottom:16px;font-size:14px}
+  h2{font:700 18px/1.3 var(--display);letter-spacing:-.01em;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+  .grid{display:grid;gap:14px}
+  .kpis{grid-template-columns:repeat(6,minmax(0,1fr))}
+  @media (max-width:1100px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media (max-width:600px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:18px}
+  .kpi p{margin:0;color:var(--muted);font-size:12.5px;font-weight:500}
+  .kpi b{display:block;font:700 30px/1.1 var(--display);letter-spacing:-.02em;margin:6px 0 4px;font-variant-numeric:tabular-nums}
+  .kpi small{color:var(--muted);font-size:12.5px}
+  .kpi small em{font-style:normal;color:var(--good);font-weight:600}
+  .two{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:14px}
+  .three{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:14px}
+  @media (max-width:900px){.two,.three{grid-template-columns:minmax(0,1fr)}}
+  .chart{position:relative;height:150px;display:flex;align-items:flex-end;gap:3px;padding-bottom:22px}
+  .chart .col{flex:1;height:100%;display:flex;align-items:flex-end;position:relative;cursor:default}
+  .chart .col i{display:block;width:100%;min-height:2px;border-radius:4px 4px 0 0;background:var(--bar)}
+  .chart .col.zero i{background:var(--track)}
+  .chart .col:hover i{opacity:.75}
+  .chart .ax{position:absolute;bottom:-20px;font-size:11px;color:var(--muted);white-space:nowrap}
+  .chart .base{position:absolute;left:0;right:0;bottom:22px;border-top:1px solid var(--line)}
+  .tip{position:fixed;z-index:9;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12.5px;padding:7px 10px;border-radius:10px;white-space:nowrap;transform:translate(-50%,-110%);display:none}
+  .tip b{font-weight:600}
+  .total{font:700 22px/1 var(--display);margin:0 0 10px}
+  .rows .r{display:grid;grid-template-columns:150px minmax(0,1fr) 64px;align-items:center;gap:12px;padding:7px 0;font-size:14px}
+  @media (max-width:600px){.rows .r{grid-template-columns:110px minmax(0,1fr) 54px}}
+  .rows .r span:first-child{color:var(--ink2)}
+  .rows .r .tr{height:10px;border-radius:99px;background:var(--track);overflow:hidden}
+  .rows .r .tr i{display:block;height:100%;border-radius:99px;background:var(--bar)}
+  .rows .r b{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+  .rows .r b small{display:block;font-weight:500;color:var(--muted);font-size:11.5px}
+  .stat{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+  .stat:first-of-type{border-top:0}
+  .stat span{color:var(--ink2)}
+  .stat b{font-variant-numeric:tabular-nums}
+  .users{margin-top:14px}
+  .uhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .search{flex:1;min-width:200px;max-width:360px;height:40px;padding:0 14px;border-radius:99px;border:1px solid var(--line);background:var(--bg)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;font-weight:600;color:var(--muted);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+  th[aria-sort] ::after{content:""}
+  th.on{color:var(--ink)}
+  td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  th.num{text-align:right}
+  .who b{display:block;font-weight:600}
+  .who small{color:var(--muted)}
+  .pill{display:inline-block;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:99px;background:var(--raise);color:var(--ink2);margin:0 4px 4px 0;white-space:nowrap}
+  .pill.ok{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}
+  .pill.no{color:var(--muted)}
+  .pill.admin{background:var(--ink);color:var(--bg)}
+  .dim{color:var(--muted)}
+  .tablewrap{overflow-x:auto}
+  .cards{display:none}
+  @media (max-width:760px){.tablewrap{display:none}.cards{display:block}}
+  .ucard{padding:14px 0;border-top:1px solid var(--line)}
+  .ucard:first-child{border-top:0}
+  .ucard .top{display:flex;justify-content:space-between;gap:10px}
+  .ucard .meta{color:var(--muted);font-size:12.5px;margin:4px 0 8px}
+  .empty{padding:24px;text-align:center;color:var(--muted)}
+  .gate{max-width:440px;margin:12vh auto 0;text-align:center}
+  .gate h1{font:700 28px/1.2 var(--display);margin:18px 0 8px}
+  .gate p{color:var(--ink2)}
+  .privacy{color:var(--muted);font-size:12.5px;margin-top:22px;text-align:center}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="logo" href="./"><i aria-hidden="true"></i><span>egom</span></a><span class="tag">Admin</span>
+    <span class="grow"></span>
+    <span class="asof" id="asof"></span>
+    <button class="btn" id="refresh" type="button" aria-label="Refresh">Refresh</button>
+    <a class="btn" href="./">Open Egom</a>
+  </header>
+
+  <section id="gate" class="gate hidden">
+    <h1 id="gateT">Checking…</h1>
+    <p id="gateP"></p>
+    <a class="btn primary" id="gateBtn" href="./">Go to Egom</a>
+  </section>
+
+  <main id="dash" class="hidden">
+    <div class="warn hidden" id="mfaWarn" role="note"><b>!</b><span>Your admin account doesn't have two-step verification yet. Turn it on in Egom → Account → Security, because this page shows every user.</span></div>
+
+    <div class="grid kpis" id="kpis"></div>
+
+    <div class="grid two">
+      <section class="card"><h2>Sign-ups</h2><p class="sub">New accounts per day, last 30 days</p><p class="total" id="suTotal"></p><div class="chart" id="chSign"></div></section>
+      <section class="card"><h2>Records added</h2><p class="sub">Money in and out saved per day, last 30 days (WhatsApp and website)</p><p class="total" id="rcTotal"></p><div class="chart" id="chRec"></div></section>
+    </div>
+
+    <div class="grid three">
+      <section class="card"><h2>How far people get</h2><p class="sub">Share of all users who reached each step</p><div class="rows" id="funnel"></div></section>
+      <section class="card"><h2>Where records come from</h2><p class="sub">All records so far</p><div class="rows" id="sources"></div>
+        <div style="margin-top:14px" id="health"></div></section>
+      <section class="card"><h2>Business side</h2><p class="sub">Totals across all businesses</p><div id="biz"></div></section>
+    </div>
+
+    <div class="grid two">
+      <section class="card"><h2>Money tracked</h2><p class="sub">All users combined, last 30 days</p><div id="money"></div></section>
+      <section class="card"><h2>Security and alerts</h2><p class="sub">Share of users who turned these on</p><div class="rows" id="security"></div></section>
+    </div>
+
+    <section class="card users">
+      <div class="uhead"><div class="grow"><h2>Users</h2><p class="sub" style="margin:0" id="ucount"></p></div>
+        <input class="search" id="q" type="search" placeholder="Search name, email or business" aria-label="Search users"></div>
+      <div class="tablewrap"><table aria-label="Users">
+        <thead><tr>
+          <th data-s="name">User</th><th data-s="joined" class="on">Joined</th><th data-s="active">Last active</th>
+          <th>WhatsApp</th><th data-s="business">Business</th><th data-s="records" class="num">Records</th><th data-s="invoices" class="num">Invoices</th><th>Security</th>
+        </tr></thead><tbody id="ubody"></tbody></table></div>
+      <div class="cards" id="ucards"></div>
+      <p class="privacy">This page shows who uses Egom and what they use, never anyone's amounts or transactions.</p>
+    </section>
+  </main>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script type="module">
+const SUPABASE_URL = "https://pnjjnungbbfpcetdlxcj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_yEwyfOK-1ON1fW2J8LnvMg_RQcdH9JM";
+const DEMO = !SUPABASE_KEY.startsWith("sb_") || new URLSearchParams(location.search).has("demo");
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const n = (v) => Number(v || 0).toLocaleString("en-NG");
+const naira = (v) => { v = Number(v || 0); const a = Math.abs(v); return "₦" + (a >= 1e9 ? (v / 1e9).toFixed(2) + "bn" : a >= 1e6 ? (v / 1e6).toFixed(2) + "m" : a >= 1e3 ? Math.round(v / 1e3) + "k" : Math.round(v)); };
+const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
+const day = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const ago = (iso) => { if (!iso) return "—"; const m = (Date.now() - new Date(iso)) / 60000;
+  return m < 2 ? "just now" : m < 60 ? Math.round(m) + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : m < 2880 ? "yesterday" : m < 43200 ? Math.round(m / 1440) + " days ago" : day(iso); };
+let sb = null, users = [], sort = { key: "joined", dir: -1 };
+
+function gate(title, text, btn) { $("dash").classList.add("hidden"); $("gate").classList.remove("hidden"); $("gateT").textContent = title; $("gateP").textContent = text; $("gateBtn").classList.toggle("hidden", !btn); }
+
+async function start() {
+  if (DEMO) return show(demoOverview(), demoUsers());
+  const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
+  sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true } });
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return gate("Sign in first", "Sign in to Egom with your admin account, then come back to this page.", true);
+  await load();
+}
+async function load() {
+  $("refresh").disabled = true;
+  const [o, u] = await Promise.all([sb.rpc("egom_admin_overview"), sb.rpc("egom_admin_users", { p_limit: 500 })]);
+  $("refresh").disabled = false;
+  if (o.error || u.error) {
+    const msg = (o.error || u.error).message || "";
+    return gate("No access", /not allowed/i.test(msg) ? "This account isn't an Egom admin, or it still needs its two-step code. Open Egom, finish signing in, then reload this page." : "Couldn't load the dashboard: " + msg, true);
+  }
+  show(o.data, u.data);
+}
+
+function show(o, list) {
+  users = list || [];
+  $("gate").classList.add("hidden"); $("dash").classList.remove("hidden");
+  $("asof").textContent = "Updated " + new Date(o.as_of).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  $("mfaWarn").classList.toggle("hidden", !!o.admin_two_step);
+  const U = o.users, R = o.records, B = o.business, total = U.total || 0;
+  const inv = B.invoices || {}, sent = Object.entries(inv).filter(([k]) => k !== "draft" && k !== "void").reduce((a, [, v]) => a + v, 0);
+  const kpi = (label, val, sub) => `<div class="card kpi"><p>${label}</p><b>${val}</b><small>${sub}</small></div>`;
+  $("kpis").innerHTML = [
+    kpi("Users", n(total), U.new_7d ? `<em>+${n(U.new_7d)}</em> this week` : "none new this week"),
+    kpi("Active, last 7 days", n(U.active_7d), `${n(U.active_30d)} in 30 days`),
+    kpi("WhatsApp linked", n(U.whatsapp), `${pct(U.whatsapp, total)}% of users`),
+    kpi("Businesses", n(B.businesses), `${pct(U.business, total)}% of users`),
+    kpi("Records", n(R.total), `${n(R.last_7d)} this week`),
+    kpi("Invoices sent", n(sent), `${n(inv.draft || 0)} drafts`),
+  ].join("");
+  const daily = o.daily || [];
+  bars("chSign", daily.map((d) => ({ d: d.day, v: d.signups, t: `${n(d.signups)} sign-up${d.signups === 1 ? "" : "s"}` })));
+  bars("chRec", daily.map((d) => ({ d: d.day, v: d.records, t: `${n(d.records)} record${d.records === 1 ? "" : "s"} · ${n(d.whatsapp)} by WhatsApp` })));
+  $("suTotal").textContent = n(daily.reduce((a, d) => a + d.signups, 0)) + " in 30 days";
+  $("rcTotal").textContent = n(daily.reduce((a, d) => a + d.records, 0)) + " in 30 days";
+  const withRecords = users.filter((u) => u.records > 0).length, withInv = users.filter((u) => u.invoices > 0).length;
+  rows("funnel", [["Signed up", total], ["Finished setup", U.onboarded], ["Linked WhatsApp", U.whatsapp], ["Added a record", withRecords], ["Set up a business", U.business], ["Sent an invoice", withInv]], total, true);
+  const SRC = { whatsapp: "WhatsApp", dashboard: "Website", manual: "Typed in", invoice: "Customer payments", purchase: "Vendor payments", other: "Other" };
+  const src = Object.entries(R.by_source || {}).sort((a, b) => b[1] - a[1]);
+  rows("sources", src.map(([k, v]) => [SRC[k] || k, v]), Math.max(1, ...src.map(([, v]) => v)), false);
+  $("health").innerHTML = stat("Last record by WhatsApp", R.whatsapp_last ? ago(R.whatsapp_last) : "never");
+  $("biz").innerHTML = [stat("Customers", n(B.customers)), stat("Quotes", n(B.quotes)), stat("Invoices sent", n(sent)),
+    stat("Payments recorded", n(B.payments)), stat("Vendors", n(B.vendors)), stat("Purchases", n(B.purchases))].join("");
+  $("money").innerHTML = [stat("Money in", naira(R.money_in_30d)), stat("Money out", naira(R.money_out_30d)),
+    stat("Invoiced by businesses", naira((B.invoiced_30d || 0) / 100)), stat("Paid to businesses", naira((B.paid_30d || 0) / 100))].join("");
+  rows("security", [["Two-step verification", U.two_step], ["Password set", U.password], ["Notifications on", U.push]], total, true);
+  drawUsers();
+}
+const stat = (k, v) => `<div class="stat"><span>${k}</span><b>${v}</b></div>`;
+function rows(id, list, max, asPct) {
+  $(id).innerHTML = list.length ? list.map(([k, v]) => `<div class="r"><span>${esc(k)}</span><span class="tr" role="img" aria-label="${esc(k)}: ${n(v)}"><i style="width:${Math.max(v ? 2 : 0, v / (max || 1) * 100)}%"></i></span>
+    <b>${n(v)}${asPct ? `<small>${pct(v, max)}%</small>` : ""}</b></div>`).join("") : `<p class="dim">Nothing yet.</p>`;
+}
+function bars(id, pts) {
+  const max = Math.max(1, ...pts.map((p) => p.v)), el = $(id);
+  el.innerHTML = `<div class="base"></div>` + pts.map((p, i) => `<div class="col ${p.v ? "" : "zero"}" data-t="${esc(day(p.d) + " · " + p.t)}"><i style="height:${p.v ? Math.max(4, p.v / max * 100) : 2}%"></i>${i === 0 || i === pts.length - 1 || i === Math.floor(pts.length / 2) ? `<span class="ax" style="${i === pts.length - 1 ? "right:0" : i === 0 ? "left:0" : "left:50%;transform:translateX(-50%)"}">${day(p.d)}</span>` : ""}</div>`).join("");
+  el.querySelectorAll(".col").forEach((c) => {
+    c.onmouseenter = (e) => { const t = $("tip"); t.innerHTML = esc(c.dataset.t); t.style.display = "block"; const r = c.getBoundingClientRect(); t.style.left = r.left + r.width / 2 + "px"; t.style.top = r.top + "px"; };
+    c.onmouseleave = () => { $("tip").style.display = "none"; };
+  });
+}
+function drawUsers() {
+  const q = $("q").value.trim().toLowerCase();
+  const active = (u) => [u.last_sign_in, u.last_record].filter(Boolean).sort().pop() || "";
+  const key = { name: (u) => (u.name || u.email || "").toLowerCase(), joined: (u) => u.joined || "", active, business: (u) => (u.business || "").toLowerCase(), records: (u) => u.records, invoices: (u) => u.invoices }[sort.key];
+  const list = users.filter((u) => !q || [u.name, u.email, u.business].some((x) => (x || "").toLowerCase().includes(q)))
+    .sort((a, b) => (key(a) > key(b) ? 1 : key(a) < key(b) ? -1 : 0) * sort.dir);
+  $("ucount").textContent = `${n(list.length)} of ${n(users.length)}`;
+  const sec = (u) => `${u.admin ? `<span class="pill admin">Admin</span>` : ""}<span class="pill ${u.two_step ? "ok" : "no"}">${u.two_step ? "Two-step" : "No two-step"}</span>${u.password ? `<span class="pill">Password</span>` : ""}${u.push ? `<span class="pill">Alerts</span>` : ""}`;
+  const wa = (u) => u.whatsapp ? `${esc(u.whatsapp)}<br><small class="dim">${n(u.records_whatsapp)} by WhatsApp</small>` : `<span class="dim">Not linked</span>`;
+  const bz = (u) => u.business ? `${esc(u.business)}${u.business_kind ? `<br><small class="dim">${esc(u.business_kind)}</small>` : ""}` : `<span class="dim">—</span>`;
+  $("ubody").innerHTML = list.length ? list.map((u) => `<tr>
+    <td class="who"><b>${esc(u.name || "No name yet")}</b><small>${esc(u.email)}</small></td>
+    <td>${day(u.joined)}${u.onboarded ? "" : `<br><small class="dim">setup not finished</small>`}</td>
+    <td>${ago(active(u))}</td><td>${wa(u)}</td><td>${bz(u)}</td>
+    <td class="num">${n(u.records)}</td><td class="num">${u.business ? n(u.invoices) : `<span class="dim">—</span>`}</td><td>${sec(u)}</td></tr>`).join("")
+    : `<tr><td colspan="8" class="empty">No users match.</td></tr>`;
+  $("ucards").innerHTML = list.length ? list.map((u) => `<div class="ucard"><div class="top"><div class="who"><b>${esc(u.name || "No name yet")}</b><small>${esc(u.email)}</small></div><span class="dim" style="font-size:12.5px;white-space:nowrap">${ago(active(u))}</span></div>
+    <p class="meta">Joined ${day(u.joined)} · ${n(u.records)} records${u.business ? ` · ${esc(u.business)} · ${n(u.invoices)} invoices` : ""}${u.whatsapp ? " · WhatsApp linked" : ""}</p>${sec(u)}</div>`).join("")
+    : `<p class="empty">No users match.</p>`;
+}
+document.querySelectorAll("th[data-s]").forEach((th) => th.onclick = () => {
+  const k = th.dataset.s; sort = { key: k, dir: sort.key === k ? -sort.dir : (k === "name" || k === "business" ? 1 : -1) };
+  document.querySelectorAll("th[data-s]").forEach((x) => { x.classList.toggle("on", x === th); x.removeAttribute("aria-sort"); });
+  th.setAttribute("aria-sort", sort.dir > 0 ? "ascending" : "descending"); drawUsers();
+});
+$("q").oninput = drawUsers;
+$("refresh").onclick = () => (DEMO ? show(demoOverview(), demoUsers()) : load());
+
+function demoOverview() {
+  const daily = []; for (let i = 29; i >= 0; i--) { const d = new Date(Date.now() - i * 864e5); const s = Math.max(0, Math.round(Math.sin(i / 3) * 2 + (30 - i) / 6)); daily.push({ day: d.toISOString().slice(0, 10), signups: s, records: s * 4 + (i % 5), whatsapp: s * 3 }); }
+  return { as_of: new Date().toISOString(), admin_two_step: true,
+    users: { total: 48, new_7d: 9, new_30d: 37, active_7d: 21, active_30d: 33, onboarded: 41, whatsapp: 26, business: 14, two_step: 6, password: 19, push: 12 },
+    records: { total: 612, last_7d: 140, by_source: { whatsapp: 401, dashboard: 132, manual: 41, invoice: 26, purchase: 12 }, by_kind: { expense: 498, income: 114 }, whatsapp_last: new Date(Date.now() - 18 * 60000).toISOString(), money_in_30d: 8420000, money_out_30d: 5310500 },
+    business: { businesses: 14, customers: 63, invoices: { draft: 7, sent: 22, paid: 31, partly_paid: 5, void: 2 }, invoiced_30d: 1243000000, quotes: 19, payments: 44, paid_30d: 905000000, purchases: 17, vendors: 11 }, daily };
+}
+function demoUsers() {
+  const P = [["Ada Obi", "ada@example.com", "Bright Homes Ltd", "building"], ["Tunde Bello", "tunde@example.com", null, null], ["Ngozi Eze", "ngozi@example.com", "Eze Fabrics", "retail"], ["Musa Ibrahim", "musa@example.com", null, null], ["Chika Nwosu", "chika@example.com", "CN Logistics", "transport"], ["Bola Ade", "bola@example.com", null, null]];
+  return P.map(([name, email, biz, kind], i) => ({ id: String(i), name, email, joined: new Date(Date.now() - (i * 5 + 1) * 864e5).toISOString(), last_sign_in: new Date(Date.now() - (i * 7 + 2) * 36e5).toISOString(),
+    last_record: i % 2 ? null : new Date(Date.now() - i * 36e5).toISOString(), onboarded: i !== 3, whatsapp: i % 3 === 1 ? null : "•••• " + (4100 + i * 37), records: 60 - i * 9, records_whatsapp: 40 - i * 6,
+    business: biz, business_kind: kind, invoices: biz ? 12 - i : 0, customers: biz ? 8 : 0, two_step: i === 0, password: i < 3, push: i % 2 === 0, admin: i === 0 }));
+}
+start().catch((e) => gate("Something went wrong", String(e.message || e), true));
+</script>
+</body>
+</html>
