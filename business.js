@@ -396,7 +396,25 @@
         <div class="gcard"><p>Unpaid</p><b>${shortK(open.reduce((a, i) => a + balance(i), 0))}</b></div>
         <div class="gcard"><p>Overdue</p><b class="${late.length ? "bz-late" : ""}">${shortK(late.reduce((a, i) => a + balance(i), 0))}</b></div>
         <div class="gcard"><p>Paid · ${esc(new Date(ym + "-15").toLocaleDateString("en-GB", { month: "short" }))}</p><b class="${paidMonth ? "bz-paid" : ""}">${shortK(paidMonth)}</b></div></div>` : ""}
-      <div class="bz-chips" role="group" aria-label="Filter">${F.map(([k, l]) => `<button type="button" data-f="${k}" aria-pressed="${S.filter === k}" class="${S.filter === k ? "on" : ""}">${l}</button>`).join("")}</div>
+      <div class="bz-search">${svg(P.search, 18)}<input id="bzDocQ" type="search" value="${esc(S.docQuery || "")}" placeholder="Search invoices and quotes by name or number" aria-label="Search invoices and quotes" autocomplete="off"></div>
+      <div id="bzDocList">${docListHTML(inv, list, shown, F)}</div>`;
+  }
+  // Search: three letters of any part of the name (no need for "Mr."), or part of the number, across invoices, drafts and quotes
+  const fold = (t) => String(t || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  function docMatches(d, q) {
+    const c = cust(d.customer_id);
+    const hay = fold([c.name, c.company, d.number, d.subject].filter(Boolean).join(" "));
+    return q.split(" ").every((w) => hay.includes(w));
+  }
+  function docListHTML(inv, list, shown, F) {
+    const raw = fold(S.docQuery || "");
+    if (raw.replace(/ /g, "").length >= 3) {
+      const invs = S.invoices.filter((d) => docMatches(d, raw)), qs = S.quotes.filter((d) => docMatches(d, raw));
+      const first = inv ? [["Invoices", invs, invRow], ["Quotes", qs, quoteRow]] : [["Quotes", qs, quoteRow], ["Invoices", invs, invRow]];
+      return invs.length || qs.length ? first.filter(([, l]) => l.length).map(([t, l, row]) => `<h5 class="bz-h5">${t} · ${l.length}</h5><section class="gcard bz-card bz-docs">${l.map(row).join("")}</section>`).join("")
+        : `<div class="bz-empty">No invoice or quote matches “${esc(S.docQuery.trim())}”.</div>`;
+    }
+    return `<div class="bz-chips" role="group" aria-label="Filter">${F.map(([k, l]) => `<button type="button" data-f="${k}" aria-pressed="${S.filter === k}" class="${S.filter === k ? "on" : ""}">${l}</button>`).join("")}</div>
       ${shown.length ? `<section class="gcard bz-card bz-docs">${shown.map((d) => inv ? invRow(d) : quoteRow(d)).join("")}</section>`
         : `<div class="bz-empty">${list.length ? "Nothing here." : inv ? "No invoices yet. Tap New to make your first one." : "No quotes yet. A quote turns into an invoice in one tap."}</div>`}`;
   }
@@ -413,9 +431,23 @@
   }
   function wireDocs() {
     $("bzNewDoc").onclick = () => openEditor(S.docMode === "invoices" ? "invoice" : "quote");
-    document.querySelectorAll(".bz-chips [data-f]").forEach((b) => b.onclick = () => { S.filter = b.dataset.f; draw(); });
-    document.querySelectorAll("[data-inv]").forEach((b) => b.onclick = () => openInvoice(b.dataset.inv));
-    document.querySelectorAll("[data-q]").forEach((b) => b.onclick = () => openQuote(b.dataset.q));
+    const wireList = () => {
+      document.querySelectorAll("#bzDocList .bz-chips [data-f]").forEach((b) => b.onclick = () => { S.filter = b.dataset.f; draw(); });
+      document.querySelectorAll("#bzDocList [data-inv]").forEach((b) => b.onclick = () => openInvoice(b.dataset.inv));
+      document.querySelectorAll("#bzDocList [data-q]").forEach((b) => b.onclick = () => openQuote(b.dataset.q));
+    };
+    // Typing only refreshes the list, so the search box keeps focus
+    $("bzDocQ").oninput = () => {
+      S.docQuery = $("bzDocQ").value;
+      const inv = S.docMode === "invoices", list = inv ? S.invoices : S.quotes;
+      const F = inv ? [["all", "All"], ["unpaid", "Unpaid"], ["late", "Overdue"], ["paid", "Paid"], ["draft", "Drafts"]]
+        : [["all", "All"], ["open", "Open"], ["accepted", "Accepted"], ["invoiced", "Invoiced"], ["declined", "Declined"]];
+      const shown = list.filter((d) => inv
+        ? ({ all: true, unpaid: isOpen(d), late: isLate(d), paid: d.status === "paid", draft: d.status === "draft" })[S.filter]
+        : ({ all: true, open: d.status === "draft" || d.status === "sent", accepted: d.status === "accepted", invoiced: d.status === "invoiced", declined: d.status === "declined" })[S.filter]);
+      $("bzDocList").innerHTML = docListHTML(inv, list, shown, F); wireList();
+    };
+    wireList();
   }
 
   async function lines(kind, id) {
