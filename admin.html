@@ -196,7 +196,7 @@ function show(o, list) {
     kpi("Users", n(total), U.new_7d ? `<em>+${n(U.new_7d)}</em> this week` : "none new this week"),
     kpi("Active, last 7 days", n(U.active_7d), `${n(U.active_30d)} in 30 days`),
     kpi("WhatsApp linked", n(U.whatsapp), `${pct(U.whatsapp, total)}% of users`),
-    kpi("Businesses", n(B.businesses), `${pct(U.business, total)}% of users`),
+    kpi("Have a business", n(U.business), `${pct(U.business, total)}% of users · ${n(B.businesses)} opened Business`),
     kpi("Records", n(R.total), `${n(R.last_7d)} this week`),
     kpi("Invoices sent", n(sent), `${n(inv.draft || 0)} drafts`),
   ].join("");

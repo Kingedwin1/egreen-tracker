@@ -306,7 +306,7 @@
     if (lp.length) todo.push(["bzOwe", "late", P.cart, `${lp.length} bill${lp.length === 1 ? "" : "s"} overdue`, `${K(lp.reduce((a, p) => a + pBal(p), 0))} to pay vendors`, "See"]);
     else if (soon.length) todo.push(["bzOwe", "amber", P.cart, `${soon.length} bill${soon.length === 1 ? "" : "s"} due this week`, `${K(soon.reduce((a, p) => a + pBal(p), 0))} to pay vendors`, "See"]);
     else if (owedOut()) todo.push(["bzOwe", "amber", P.cart, `You owe vendors ${K(owedOut())}`, `${S.purchases.filter(pOpen).length} to pay`, "See"]);
-    const drafts = S.invoices.filter((i) => i.status === "draft");
+    const drafts = S.invoices.filter((i) => i.status === "draft" && i.source !== "import");
     if (drafts.length) todo.push(["bzDrafts", "", P.doc, `${drafts.length} draft invoice${drafts.length === 1 ? "" : "s"} not sent`, `${K(drafts.reduce((a, i) => a + i.total_kobo, 0))} waiting to go out`, "See"]);
     const waitQ = S.quotes.filter((q) => q.status === "sent");
     if (waitQ.length) todo.push(["bzWaitQ", "", P.quote, `${waitQ.length} quote${waitQ.length === 1 ? "" : "s"} waiting for a reply`, `${K(waitQ.reduce((a, q) => a + q.total_kobo, 0))} in all`, "See"]);
@@ -490,7 +490,7 @@
       </section>
       <section class="bz-panel"><h5 class="bz-h5">History</h5>
         ${pays.map((x) => `<div class="bz-li"><span class="bz-dot lime"></span><span class="bz-grow"><b>Paid ${K(x.amount_kobo)}</b><small>${niceDate(x.p.date)} · ${esc(modeLabel(x.p.mode))}${x.p.reference ? " · " + esc(x.p.reference) : ""}</small></span>
-          <button class="bz-link danger" type="button" data-delpay="${x.p.id}">Remove</button></div>`).join("")}
+          <button class="bz-link" type="button" data-rcpt="${x.p.id}">Receipt</button><button class="bz-link danger" type="button" data-delpay="${x.p.id}">Remove</button></div>`).join("")}
         ${inv.sent_at ? `<div class="bz-li"><span class="bz-dot"></span><span class="bz-grow"><b>Sent</b><small>${niceDate(inv.sent_at.slice(0, 10))}</small></span></div>` : ""}
         <div class="bz-li"><span class="bz-dot hollow"></span><span class="bz-grow"><b>${inv.quote_id ? "Made from quote " + esc((S.quotes.find((q) => q.id === inv.quote_id) || {}).number || "") : inv.source === "recurring" ? "Raised by a repeating invoice" : "Created"}</b><small>${niceDate(inv.created_at.slice(0, 10))}</small></span></div>
       </section>
@@ -507,6 +507,7 @@
       await rpc("biz_delete_invoice", { p_invoice: inv.id }); close(); await refresh("Draft deleted"); }));
     on("bziVoid", () => confirmBox("Void " + esc(inv.number) + "?", "It stays in your list marked Void and stops counting as money owed. This can't be undone.", "Void invoice", async () => {
       await rpc("biz_void_invoice", { p_invoice: inv.id }); close(); await refresh("Invoice voided"); }));
+    document.querySelectorAll("[data-rcpt]").forEach((b) => b.onclick = () => { close(); openReceipt(b.dataset.rcpt); });
     document.querySelectorAll("[data-delpay]").forEach((b) => b.onclick = () => confirmBox("Remove this payment?", "The invoice will show as owed again, and the money-in record goes too.", "Remove payment", async () => {
       await rpc("biz_delete_payment", { p_payment: b.dataset.delpay }); close(); await refresh("Payment removed"); }));
   }
@@ -819,10 +820,11 @@
       const amt = toKobo(st.amount); if (!amt) return E().toast("Enter the amount");
       busy("bzpSave", true);
       try {
-        await rpc("biz_record_payment", { p_business: S.bizId, p_doc: { customer_id: st.customer_id, date: st.date, amount_kobo: amt, mode: st.mode,
+        const payId = await rpc("biz_record_payment", { p_business: S.bizId, p_doc: { customer_id: st.customer_id, date: st.date, amount_kobo: amt, mode: st.mode,
           account: st.mode === "cash" ? "Cash" : st.account.trim() || null, reference: st.reference.trim() || null, allocations: plan().out } });
         close(); await refresh(`${K(amt)} recorded`);
         if (E().reload) E().reload();   // the payment also shows as money in on the Egom dashboard
+        if (payId) openReceipt(payId, true);
       } catch (e) { busy("bzpSave", false); E().toast(e.message); }
     }
     paint();
@@ -1442,6 +1444,7 @@
 
   /* ---------------- printable document (owner's PDF and the customer's link) ---------------- */
   function docHTML(d) {
+    if (d.kind === "receipt") return receiptHTML(d);
     const isInv = d.kind === "invoice", bal = Math.max(0, (d.total_kobo || 0) - (d.paid_kobo || 0));
     const b = d.business || {}, c = d.customer || {};
     const accent = b.brand_color || "#C6F432", onAccent = inkOn(accent);
@@ -1471,6 +1474,68 @@
       ${b.signatory_name ? `<p class="bz-psig">${esc(b.signatory_name)}</p>` : ""}
       <footer>Made with Egom · egom.ng</footer></article>`;
   }
+  /* ---------------- RECEIPTS: proof of payment for the customer ---------------- */
+  // Receipt number: the payment's own reference if it has none of ours, made from its date and id so it stays the same every time
+  const receiptNo = (p) => "RCT-" + p.date.replace(/-/g, "").slice(2) + "-" + p.id.replace(/-/g, "").slice(0, 4).toUpperCase();
+  function receiptDoc(payId) {
+    const p = S.payments.find((x) => x.id === payId); if (!p) return null;
+    const alloc = S.allocations.filter((a) => a.payment_id === p.id).map((a) => { const i = S.invoices.find((x) => x.id === a.invoice_id) || {};
+      return { number: i.number || "Invoice", amount_kobo: a.amount_kobo, balance_kobo: i.id ? balance(i) : 0, share_token: i.share_token }; });
+    const applied = alloc.reduce((t, a) => t + a.amount_kobo, 0);
+    return { kind: "receipt", number: receiptNo(p), date: p.date, status: "paid", mode: p.mode, reference: p.reference, alloc, credit_kobo: Math.max(0, p.amount_kobo - applied),
+      total_kobo: p.amount_kobo, paid_kobo: p.amount_kobo, business: S.biz, customer: cust(p.customer_id), lines: [] };
+  }
+  function receiptText(d) {
+    const c = d.customer || {};
+    const lines = [`Hello ${c.name || "there"}, thank you. We've received ${K(d.total_kobo)} from you on ${niceDate(d.date)}.`];
+    d.alloc.forEach((a) => lines.push(`• ${a.number}: ${K(a.amount_kobo)} paid${a.balance_kobo > 0 ? `, ${K(a.balance_kobo)} still to pay` : ", fully paid"}`));
+    if (d.credit_kobo) lines.push(`• ${K(d.credit_kobo)} kept as credit for your next invoice`);
+    lines.push("", `Receipt ${d.number}${d.reference ? " · ref " + d.reference : ""}`);
+    const one = d.alloc.length === 1 && d.alloc[0].share_token;
+    if (one) lines.push(`View the invoice: ${shareUrl(d.alloc[0].share_token)}`);
+    lines.push("", `${S.biz.name}`);
+    return lines.join("\n");
+  }
+  function openReceipt(payId, justRecorded) {
+    const d = receiptDoc(payId); if (!d) return;
+    const c = d.customer || {};
+    const close = sheet("bzrc", justRecorded ? "Payment recorded" : "Receipt " + esc(d.number), `
+      <div class="bz-sumcard g-hero"><p class="gl">Received from ${esc(c.name || "customer")}</p><p class="gbig">${K(d.total_kobo)}</p>
+        <p class="bz-sub">${niceDate(d.date)} · ${esc(modeLabel(d.mode))}${d.reference ? " · " + esc(d.reference) : ""}</p></div>
+      ${d.alloc.length || d.credit_kobo ? `<section class="bz-panel">${d.alloc.map((a) => `<div class="bz-li"><span class="bz-grow"><b>${esc(a.number)}</b><small>${a.balance_kobo > 0 ? K(a.balance_kobo) + " still to pay" : "Fully paid"}</small></span><b>${K(a.amount_kobo)}</b></div>`).join("")}
+        ${d.credit_kobo ? `<div class="bz-li"><span class="bz-grow"><b>Kept as credit</b><small>Used on their next invoice</small></span><b>${K(d.credit_kobo)}</b></div>` : ""}</section>` : ""}
+      <p class="fine">${justRecorded ? "Send them a receipt so they know it arrived." : "Send it again, or save it as a PDF."}</p>
+      <button class="bz-btn primary wide big" id="bzrcWa" type="button">${svg(P.wa, 20)} Send receipt on WhatsApp</button>
+      <button class="bz-btn wide" id="bzrcPdf" type="button">${svg(P.pdf, 18)} Receipt PDF</button>
+      ${justRecorded ? `<button class="bz-link wide" id="bzrcDone" type="button">Done</button>` : ""}`);
+    $("bzrcWa").onclick = () => { if (!c.phone && !E().preview) E().toast("No phone number for this customer yet. WhatsApp will ask who to send it to."); openWhatsApp(c.phone, receiptText(d)); };
+    $("bzrcPdf").onclick = () => { close(); showPrint(d, true); };
+    if ($("bzrcDone")) $("bzrcDone").onclick = close;
+  }
+
+  function receiptHTML(d) {
+    const b = d.business || {}, c = d.customer || {};
+    const accent = b.brand_color || "#C6F432", onAccent = inkOn(accent);
+    return `<article class="bz-paper" style="--bz-accent:${accent};--bz-on:${onAccent}">
+      <header><div class="bz-pbrand">${b.logo_path ? `<img class="bz-plogo" src="${esc(b.logo_path)}" alt="${esc(b.name)} logo" style="max-height:${Math.round(64 * (Number(b.logo_scale) || 1))}px;max-width:${Math.round(220 * (Number(b.logo_scale) || 1))}px">` : ""}
+        <div><h1>${esc(b.name)}</h1><p>${esc([b.address, b.phone, b.email].filter(Boolean).join(" · "))}</p></div></div>
+        <div class="bz-ptitle"><h2>Receipt</h2><p>${esc(d.number)}</p></div></header>
+      <section class="bz-pmeta">
+        <div><small>Received from</small><b>${esc(c.name)}</b>${c.company ? `<span>${esc(c.company)}</span>` : ""}</div>
+        <div><small>Date</small><b>${niceDate(d.date)}</b><small>Paid by</small><b>${esc(modeLabel(d.mode))}</b>${d.reference ? `<small>Reference</small><b>${esc(d.reference)}</b>` : ""}</div>
+        <div class="bz-pdue"><small>Amount received</small><b>${K(d.total_kobo)}</b></div>
+      </section>
+      ${d.alloc.length ? `<table><thead><tr><th>For invoice</th><th></th><th>Paid now</th><th>Still to pay</th></tr></thead><tbody>
+        ${d.alloc.map((a) => `<tr><td><b>${esc(a.number)}</b></td><td></td><td>${K(a.amount_kobo)}</td><td>${a.balance_kobo > 0 ? K(a.balance_kobo) : "Fully paid"}</td></tr>`).join("")}
+      </tbody></table>` : ""}
+      <section class="bz-ptot">
+        ${d.credit_kobo ? `<div><span>Kept as credit</span><span>${K(d.credit_kobo)}</span></div>` : ""}
+        <div class="t"><span>Total received</span><span>${K(d.total_kobo)}</span></div>
+      </section>
+      <section class="bz-pnote"><p>Thank you for your payment.</p></section>
+      ${b.signatory_name ? `<p class="bz-psig">${esc(b.signatory_name)}</p>` : ""}
+      <footer>Made with Egom · egom.ng</footer></article>`;
+  }
   function printDoc(kind, d, ls) {
     const doc = { kind, number: d.number, date: d.date, due_date: kind === "invoice" ? d.due_date : d.expiry_date, status: d.status,
       notes: d.notes, terms: d.terms, subtotal_kobo: d.subtotal_kobo, discount_kobo: d.discount_kobo, shipping_kobo: d.shipping_kobo,
@@ -1483,7 +1548,7 @@
     wrap.innerHTML = `<div class="bz-printbar">${withClose ? `<button class="bz-btn" type="button" id="bzPrClose">${svg(P.back, 16)} Back</button>` : `<span></span>`}
       <button class="bz-btn primary" type="button" id="bzPrGo">${svg(P.pdf, 16)} Save as PDF</button></div>${docHTML(doc)}`;
     document.body.classList.add("bz-printing");
-    $("bzPrGo").onclick = () => { if (E().preview) return E().toast("In the real app this saves the invoice as a PDF.");
+    $("bzPrGo").onclick = () => { if (E().preview) return E().toast("In the real app this saves it as a PDF.");
       const t = document.title; document.title = (doc.business.name || "Egom") + " " + doc.number; window.print(); document.title = t; };
     if ($("bzPrClose")) $("bzPrClose").onclick = () => { wrap.remove(); document.body.classList.remove("bz-printing"); };
     window.scrollTo(0, 0);
