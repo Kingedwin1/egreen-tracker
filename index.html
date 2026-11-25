@@ -868,6 +868,45 @@ html,body{background:var(--bg)}
   .sideme-t small{font-size:12px;color:#A7ADB3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .sideme > .ico{flex:0 0 auto;width:16px!important;height:16px!important;color:#A7ADB3}
 }
+/* first record: right after linking WhatsApp */
+.tryit{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:20px;background:var(--surface);border:1px solid var(--line)}
+.tryit .linked{font-size:22px;padding:2px 0}
+.tryit h3{font:700 18px/1.25 var(--display);margin:4px 0 0;text-align:center}
+.tryit ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--ink-2)}
+.tryit ol b{color:var(--ink)}
+.tryit .ex{font-family:ui-monospace,Menlo,monospace;font-size:13px;padding:1px 7px;border-radius:7px;background:var(--raise);color:var(--ink);white-space:nowrap}
+.tryit .btn .ico{width:18px;height:18px;margin-right:6px;vertical-align:-4px}
+.wa-nudge.first{border-color:color-mix(in srgb,var(--accent) 60%,transparent);background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+.wa-nudge.first a.btn{text-decoration:none;white-space:nowrap}
+/* Business expenses list: search + filters, a table on laptops, rows on phones */
+.lf{padding:12px 14px}
+.lf-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.lf-q{flex:1 1 220px;display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:0 12px;color:var(--muted)}
+.lf-q svg{width:18px;height:18px;flex:0 0 18px}
+.lf-q input{border:0;background:none;padding:10px 0;margin:0;flex:1;min-width:0;font:inherit;color:var(--ink);outline:none}
+.lf-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.lf-sel{display:flex;flex-direction:column;gap:3px;margin:0;font-size:12px;color:var(--muted);font-weight:600}
+.lf-sel select{margin:0;padding:8px 10px;font-size:14px;width:100%}
+.lf-sum{display:flex;align-items:center;gap:10px;margin:2px 4px 10px;font-size:13px;color:var(--ink-2)}
+.lf-sum b{margin-left:auto;font-size:15px;color:var(--ink)}
+.lf-sum .btn{padding:5px 12px;font-size:12.5px}
+.lf-tablewrap{display:none;padding:0;overflow:hidden}
+.lf-table{width:100%;border-collapse:collapse;font-size:14px}
+.lf-table th{text-align:left;font-size:12px;font-weight:700;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+.lf-table td{padding:11px 14px;border-bottom:1px solid var(--grid);vertical-align:middle;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-table tr:last-child td{border-bottom:0}
+.lf-table tbody tr{cursor:pointer}
+.lf-table tbody tr:hover,.lf-table tbody tr:focus-visible{background:var(--grid);outline:none}
+.lf-table .r{text-align:right}
+.lf-table .strong{font-weight:600}
+.lf-table .muted{color:var(--muted)}
+.lf-cat{display:inline-flex;align-items:center;gap:7px}
+.lf-cat i{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+@media (min-width:1024px){
+  .lf-row{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .lf-tablewrap{display:block}
+  .lf-cards{display:none}
+}
 </style>
 </head>
 <body><div id="blobs" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i></div>
@@ -1498,6 +1537,7 @@ const IC = {
   receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
   pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>',
   home: '<path d="M4 11 12 4l8 7v9H4z"/><path d="M10 20v-5h4v5"/>',
   card: '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h3"/>',
   calendar: '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>',
@@ -1589,7 +1629,7 @@ function toast(t) { const el = document.createElement("div"); el.className = "to
 const bankKey = (b) => { b = String(b || "").trim(); if (!b) return "Other / unknown"; const k = Object.keys(BANK_STYLE).find((x) => b.toLowerCase().includes(x.toLowerCase())); return k || b; };
 
 /* ============ data ============ */
-let demoKeep = null;
+let demoKeep = null, rowsLoaded = false;
 async function load() {
   if (demo) {
     // The preview keeps its records for the visit, and picks up what the sample business adds (Got paid, vendor payments)
@@ -1603,7 +1643,7 @@ async function load() {
     sb.from("expenses").select("*").eq("status", "saved").order("tx_date", { ascending: false }).limit(5000),
     sb.from("budgets").select("*"),
   ]);
-  if (error) { banner("Couldn't load your expenses: " + error.message); rows = []; } else rows = data || [];
+  if (error) { banner("Couldn't load your expenses: " + error.message); rows = []; } else { rows = data || []; rowsLoaded = true; }
   budgets = {}; (b.data || []).forEach((x) => { budgets[x.space + "|" + x.category] = Number(x.monthly_limit) || 0; });
   render();
 }
@@ -1639,6 +1679,7 @@ function setBudget(space, category, limit) {
 /* ============ shared bits ============ */
 function render() {
   if (!hasBiz()) ledger = "all"; else if (ledger === "all") ledger = "personal";
+  renderWaNudge();
   if (!$("brandSlot").innerHTML) $("brandSlot").innerHTML = logoHTML(24);
   if (!$("sideBrand").innerHTML) $("sideBrand").innerHTML = logoHTML(26);
   $("view").dataset.tab = tab;
@@ -1663,7 +1704,7 @@ function render() {
 }
 
 /* ============ Egom Business (business.js): invoices, quotes, customers, reports ============ */
-const BIZ_VERSION = "15";   // raise with every business.js update so phones fetch the new copy
+const BIZ_VERSION = "16";   // raise with every business.js update so phones fetch the new copy
 let bizLoading = null;
 function loadBusiness() {
   if (window.EgomBusiness) return Promise.resolve(window.EgomBusiness);
@@ -2027,10 +2068,64 @@ function openBudgetSheet() {
 let catFilter = null;
 function renderTx() {
   const cur = monthRows(ym), exp = expenses(cur), inc = incomes(cur);
-  const head = `<div class="seg"><div class="in"><button data-m="record" class="${txMode === "record" ? "on" : ""}">Record</button><button data-m="stats" class="${txMode === "stats" ? "on" : ""}">Stats</button></div></div>`;
-  $("view").innerHTML = head + (txMode === "record" ? recordView(cur, exp, inc) : statsView(cur, exp, inc));
-  $("view").querySelectorAll(".seg [data-m]").forEach((b) => b.onclick = () => { txMode = b.dataset.m; renderTx(); });
-  if (txMode === "record") wireRecord(); else wireStats(exp);
+  const biz = ledger === "business";
+  // Business side opens on a list you can filter; the calendar is one tap away
+  const mode = biz ? bizTxMode : (txMode === "list" ? "record" : txMode);
+  const modes = biz ? [["list", "List"], ["record", "Calendar"], ["stats", "Stats"]] : [["record", "Record"], ["stats", "Stats"]];
+  const head = `<div class="seg"><div class="in">${modes.map(([k, l]) => `<button data-m="${k}" class="${mode === k ? "on" : ""}">${l}</button>`).join("")}</div></div>`;
+  $("view").innerHTML = head + (mode === "list" ? listView() : mode === "record" ? recordView(cur, exp, inc) : statsView(cur, exp, inc));
+  $("view").querySelectorAll(".seg [data-m]").forEach((b) => b.onclick = () => { if (biz) { bizTxMode = b.dataset.m; try { localStorage.setItem("egom_biz_txmode", bizTxMode); } catch (e) {} } else txMode = b.dataset.m; renderTx(); });
+  if (mode === "list") wireList(); else if (mode === "record") wireRecord(); else wireStats(exp);
+}
+/* ---- Business expenses as a list: search, filter by vendor, category and account ---- */
+let bizTxMode = (() => { try { return localStorage.getItem("egom_biz_txmode") || "list"; } catch (e) { return "list"; } })();
+const LF = { q: "", who: "", cat: "", acct: "", kind: "out", scope: "month" };
+const whoOf = (r) => (r.counterparty || "").trim();
+function listRows() {
+  const base = (LF.scope === "all" ? rows.filter(inLedger) : monthRows(ym)).filter((r) => r.kind !== "transfer");
+  const q = LF.q.trim().toLowerCase();
+  return base.filter((r) => (LF.kind === "all" || (LF.kind === "out" ? r.kind !== "income" : r.kind === "income"))
+    && (!LF.who || whoOf(r) === LF.who) && (!LF.cat || r.category === LF.cat) && (!LF.acct || (r.bank || "") === LF.acct)
+    && (!q || [r.counterparty, r.narration, r.note, r.category, r.reference, r.bank, String(r.amount)].filter(Boolean).join(" ").toLowerCase().includes(q)))
+    .sort((a, b) => (b.tx_date + (b.tx_time || "")).localeCompare(a.tx_date + (a.tx_time || "")));
+}
+function listView() {
+  const pool = (LF.scope === "all" ? rows.filter(inLedger) : monthRows(ym)).filter((r) => r.kind !== "transfer" && (LF.kind === "all" || (LF.kind === "out" ? r.kind !== "income" : r.kind === "income")));
+  const uniq = (f) => [...new Set(pool.map(f).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const whos = uniq(whoOf), cats = uniq((r) => r.category), accts = uniq((r) => r.bank);
+  [["who", whos], ["cat", cats], ["acct", accts]].forEach(([k, l]) => { if (LF[k] && !l.includes(LF[k])) LF[k] = ""; });
+  const sel = (id, label, all, list, v) => `<label class="lf-sel"><span>${label}</span><select id="${id}"><option value="">${all}</option>${list.map((x) => `<option${x === v ? " selected" : ""}>${esc(x)}</option>`).join("")}</select></label>`;
+  return `<div class="card lf">
+      <div class="lf-top"><div class="lf-q">${icon("search")}<input id="lfQ" type="search" value="${esc(LF.q)}" placeholder="Search who, note, amount or reference" aria-label="Search records" autocomplete="off"></div>
+        <div class="toggle">${[["out", "Spent"], ["in", "Received"], ["all", "All"]].map(([k, l]) => `<button type="button" data-lk="${k}" class="${LF.kind === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
+      <div class="lf-row">${sel("lfWho", "Vendor", "All vendors", whos, LF.who)}${sel("lfCat", "Category", "All categories", cats, LF.cat)}${sel("lfAcct", "Account", "All accounts", accts, LF.acct)}
+        <label class="lf-sel"><span>When</span><select id="lfScope"><option value="month"${LF.scope === "month" ? " selected" : ""}>${esc(monthTitle(ym))}</option><option value="all"${LF.scope === "all" ? " selected" : ""}>All time</option></select></label></div>
+    </div><div id="lfOut">${listOut()}</div>`;
+}
+function listOut() {
+  const list = listRows(), total = list.reduce((t, r) => t + (r.kind === "income" ? Number(r.amount) : spend(r)), 0);
+  const any = LF.q || LF.who || LF.cat || LF.acct;
+  const sumLine = `<div class="lf-sum"><span>${list.length} record${list.length === 1 ? "" : "s"}${any ? " match" : ""}</span><b>${money(total)}</b>${any ? `<button class="btn" id="lfClear" type="button">Clear filters</button>` : ""}</div>`;
+  if (!list.length) return sumLine + `<div class="empty">${rows.filter(inLedger).length ? "Nothing matches. Try another filter or All time." : "No records yet. Forward a receipt to Egom on WhatsApp, or tap + to add one."}</div>`;
+  const amt = (r) => r.kind === "income" ? `<b class="inc">+${money(r.amount)}</b>` : `<b class="exp">-${money(spend(r))}</b>`;
+  const shown = list.slice(0, 400);
+  const table = `<div class="card lf-tablewrap"><table class="lf-table"><thead><tr><th>Date</th><th>Vendor</th><th>Category</th><th>Account</th><th>Note</th><th class="r">Amount</th></tr></thead><tbody>
+    ${shown.map((r) => `<tr class="tx-tr" data-id="${r.id}" tabindex="0"><td>${esc(niceDay(r.tx_date))}</td><td class="strong">${esc(whoOf(r) || "—")}</td><td><span class="lf-cat"><i style="background:${colorOf(r.category)[1]}"></i>${esc(r.category || "")}</span></td><td>${esc(r.bank || "—")}</td><td class="muted">${esc([r.narration, r.note].filter(Boolean).join(" · ") || "")}</td><td class="r">${amt(r)}</td></tr>`).join("")}
+    </tbody></table></div>`;
+  const cards = `<div class="card lf-cards" style="padding:0">${shown.map((r) => txRow(r).replace('<div class="t2">', `<div class="t2">${esc(niceDay(r.tx_date))} · `)).join("")}</div>`;
+  return sumLine + table + cards + (list.length > shown.length ? `<p class="fine" style="text-align:center">Showing the latest ${shown.length}. Narrow the filters to see older ones.</p>` : "");
+}
+const niceDay = (d) => { const [y, m, dd] = (d || "").split("-").map(Number); return y ? new Date(y, m - 1, dd).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: y === now.getFullYear() ? undefined : "numeric" }) : ""; };
+function wireList() {
+  const out = () => { $("lfOut").innerHTML = listOut(); wireOut(); };
+  const wireOut = () => {
+    $("view").querySelectorAll("#lfOut [data-id]").forEach((el) => { el.onclick = () => openTx(el.dataset.id); el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openTx(el.dataset.id); } }; });
+    if ($("lfClear")) $("lfClear").onclick = () => { Object.assign(LF, { q: "", who: "", cat: "", acct: "" }); renderTx(); };
+  };
+  $("lfQ").oninput = () => { LF.q = $("lfQ").value; out(); };
+  [["lfWho", "who"], ["lfCat", "cat"], ["lfAcct", "acct"], ["lfScope", "scope"]].forEach(([id, k]) => $(id).onchange = () => { LF[k] = $(id).value; renderTx(); });
+  $("view").querySelectorAll("[data-lk]").forEach((b) => b.onclick = () => { LF.kind = b.dataset.lk; renderTx(); });
+  wireOut();
 }
 // Business side: invoices falling due show on the Expenses calendar too
 const calExtras = () => (ledger === "business" && window.EgomBusiness && window.EgomBusiness.calendarExtras ? window.EgomBusiness.calendarExtras(ym) : []);
@@ -2868,6 +2963,20 @@ function startLinkPoll(onLinked) {
     if (data?.whatsapp) { profile.whatsapp = data.whatsapp; stopLinkPoll(); onLinked(); }
   }, 3000);
 }
+// Right after linking: get the first record in, while they're here
+const waChat = (text) => `https://wa.me/${BOT_NUMBER}${text ? "?text=" + encodeURIComponent(text) : ""}`;
+function tryItBlock() {
+  return `<div class="tryit">
+      <div class="linked">${icon("check")}<b>Linked</b><span>${esc(fmtPhone(profile.whatsapp))}</span></div>
+      <h3>Now try it: send your first one</h3>
+      <ol>
+        <li><b>Forward a receipt.</b> Open your bank app, tap a recent transfer, then <i>Share receipt</i> → WhatsApp → Egom.</li>
+        <li><b>Or just type it</b> in the Egom chat, like <span class="ex">2500 lunch</span> or <span class="ex">+50000 from Ada</span>.</li>
+      </ol>
+      <a class="btn wa big" href="${waChat("2500 lunch")}" target="_blank" rel="noopener">${icon("chat")}Open the Egom chat</a>
+      <p class="fine">It shows up here a few seconds after Egom replies.</p>
+    </div>`;
+}
 function linkBlock(code) {
   return `<div class="linkcard">
       <div class="lc-code">LINK ${code}</div>
@@ -2892,7 +3001,7 @@ async function screenLink(onboarding) {
   };
   $("later").onclick = finish;
   if (code) startLinkPoll(() => {
-    $("authBody").querySelector(".linkcard").innerHTML = `<div class="linked">${icon("check")}<b>Linked</b><span>${esc(fmtPhone(profile.whatsapp))}</span></div><p class="fine">Forward a receipt to ${BOT_DISPLAY} to try it.</p>`;
+    $("authBody").querySelector(".linkcard").outerHTML = tryItBlock();
     $("later").textContent = "Go to my dashboard"; $("later").classList.remove("ghost"); $("later").classList.add("primary");
   });
 }
@@ -2900,6 +3009,11 @@ async function screenLink(onboarding) {
 // A gentle reminder on the dashboard until WhatsApp is linked
 function renderWaNudge() {
   const el = $("waNudge");
+  if (profile && profile.whatsapp && rowsLoaded && !rows.length) {
+    el.className = "wa-nudge first";
+    el.innerHTML = `${icon("chat")}<div><b>Send Egom your first receipt</b><small>Share any transfer receipt from your bank app to the Egom chat, or type <i>2500 lunch</i>.</small></div><a class="btn primary" href="${waChat("")}" target="_blank" rel="noopener">Open chat</a>`;
+    return;
+  }
   if (!profile || profile.whatsapp) { el.classList.add("hidden"); return; }
   el.className = "wa-nudge";
   el.innerHTML = `${icon("chat")}<div><b>Link WhatsApp</b><small>Forward receipts straight to Egom.</small></div><button class="btn" id="nudgeGo">Link</button>`;
@@ -2916,9 +3030,9 @@ async function openLinkSheet() {
   $("lx").onclick = close; $("lbg").onclick = (e) => { if (e.target.id === "lbg") close(); };
   startLinkPoll(() => {
     const c = document.querySelector("#sheetRoot .linkcard");
-    if (c) c.innerHTML = `<div class="linked">${icon("check")}<b>Linked</b><span>${esc(fmtPhone(profile.whatsapp))}</span></div>`;
+    if (c) c.outerHTML = tryItBlock();
+    const p = document.querySelector("#sheetRoot .step-p"); if (p) p.remove();
     renderWaNudge(); toast("WhatsApp linked");
-    setTimeout(() => { if (document.querySelector("#sheetRoot .linkcard")) close(); }, 1800);
   });
 }
 
@@ -2947,6 +3061,7 @@ function openSettings() {
     <button class="btn" id="sApp" style="width:100%;margin-top:10px">App &amp; notifications</button>
     <button class="btn" id="sCats" style="width:100%;margin-top:10px">Categories</button>
     <button class="btn" id="sRefresh" style="width:100%;margin-top:10px">Refresh data</button>
+    <button class="btn" id="sData" style="width:100%;margin-top:10px">Your data: download or delete</button>
     <button class="btn danger" id="sOut" style="width:100%;margin-top:18px">Sign out</button>
     <p class="fine" style="text-align:center;margin-top:14px"><a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a> · <a href="mailto:support@egom.ng">support@egom.ng</a></p>
   </div></div>`;
@@ -2967,6 +3082,7 @@ function openSettings() {
   $("sCats").onclick = () => { close(); openCategories(); };
   $("sApp").onclick = () => { close(); openAppSheet(); };
   $("sSec").onclick = () => { close(); openSecurity(); };
+  $("sData").onclick = () => { close(); openDataSheet(); };
   if ($("sLink")) $("sLink").onclick = () => { close(); openLinkSheet(); };
   if ($("sUnlink")) $("sUnlink").onclick = async () => {
     if ($("sUnlink").dataset.armed !== "1") { $("sUnlink").dataset.armed = "1"; $("sUnlink").textContent = "Tap again to unlink"; return; }
@@ -2978,6 +3094,67 @@ function openSettings() {
     if (!demo) await sb.auth.signOut();
     profile = null; session = null; rows = []; authEmail = ""; demoMfa.passed = false;
     screenEmail();
+  };
+}
+// ---- Your data: download a copy, or delete the account ---------------------------------------
+const EXPORT_TABLES = ["profiles", "expenses", "budgets", "category_rules", "businesses", "business_members", "biz_accounts", "biz_customers", "biz_items", "biz_recurring", "biz_invoices", "biz_quotes", "biz_lines", "biz_payments", "biz_allocations", "biz_vendors", "biz_purchases", "biz_purchase_lines", "biz_vendor_payments", "biz_journal", "biz_journal_lines"];
+async function fetchAll(table) {
+  const out = [];
+  for (let from = 0; from < 100000; from += 1000) {
+    const { data, error } = await sb.from(table).select("*").range(from, from + 999);
+    if (error) return out.length ? out : null;
+    out.push(...data); if (data.length < 1000) break;
+  }
+  return out;
+}
+const csvCell = (v) => { const t = v == null ? "" : String(v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+function saveFile(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+async function downloadMyData(btn) {
+  btn.disabled = true; btn.textContent = "Getting your data…";
+  const day = new Date().toISOString().slice(0, 10), data = { exported_at: new Date().toISOString(), email: profile.email || me };
+  if (demo) data.expenses = rows;
+  else for (const t of EXPORT_TABLES) { const r = await fetchAll(t); if (r && r.length) data[t] = r; }
+  saveFile(`egom-data-${day}.json`, JSON.stringify(data, null, 2), "application/json");
+  const recs = (data.expenses || rows).slice().sort((a, b) => (b.tx_date || "").localeCompare(a.tx_date || ""));
+  const cols = [["tx_date", "Date"], ["kind", "Type"], ["amount", "Amount"], ["fee", "Fee"], ["counterparty", "Who"], ["narration", "Description"], ["category", "Category"], ["space", "Side"], ["bank", "Bank"], ["reference", "Reference"], ["note", "Note"], ["source", "Added by"]];
+  const csv = [cols.map((c) => c[1]).join(","), ...recs.map((r) => cols.map((c) => csvCell(r[c[0]])).join(","))].join("\n");
+  setTimeout(() => saveFile(`egom-records-${day}.csv`, "\ufeff" + csv, "text/csv"), 600);
+  btn.disabled = false; btn.textContent = "Download my data"; toast("Downloaded: a full copy plus your records as a spreadsheet");
+}
+function openDataSheet() {
+  $("sheetRoot").innerHTML = `<div class="bg" id="dbg"><div class="sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center"><h4>Your data</h4><button class="btn" id="dx" aria-label="Close">${icon("close")}</button></div>
+    <p class="fine" style="margin-top:6px">Everything in Egom is yours. Take a copy any time, or delete it all.</p>
+    <label style="margin-top:16px">Download my data</label>
+    <p class="fine">Two files: a full copy of everything (JSON), and your records as a spreadsheet (CSV) you can open in Excel or Google Sheets.</p>
+    <button class="btn primary" id="dDown" style="width:100%;margin-top:8px">Download my data</button>
+    <label style="margin-top:24px">Delete my account</label>
+    <p class="fine">This removes your account, all your records, budgets and categories, your WhatsApp link, and your business with its customers, invoices, quotes, payments and purchases. It can't be undone. Download a copy first if you may need it.</p>
+    <div id="delBox" class="hidden">
+      <label for="dConfirm">Type DELETE to confirm</label>
+      <input id="dConfirm" autocomplete="off" autocapitalize="characters" placeholder="DELETE">
+    </div>
+    <button class="btn danger" id="dDel" style="width:100%;margin-top:10px">Delete my account</button>
+  </div></div>`;
+  const close = () => ($("sheetRoot").innerHTML = "");
+  $("dx").onclick = close; $("dbg").onclick = (e) => { if (e.target.id === "dbg") close(); };
+  $("dDown").onclick = () => downloadMyData($("dDown"));
+  $("dDel").onclick = async () => {
+    const box = $("delBox");
+    if (box.classList.contains("hidden")) { box.classList.remove("hidden"); $("dDel").textContent = "Delete everything for good"; $("dConfirm").focus(); return; }
+    const v = $("dConfirm").value.trim().toUpperCase();
+    if (v !== "DELETE") return toast("Type DELETE to confirm");
+    if (demo) { close(); return toast("Preview only: nothing was deleted"); }
+    $("dDel").disabled = true; $("dDel").textContent = "Deleting…";
+    const { error } = await sb.rpc("egom_delete_my_account", { p_confirm: v });
+    if (error) { $("dDel").disabled = false; $("dDel").textContent = "Delete everything for good"; return toast(/authenticator|two-step|aal/i.test(error.message) ? "Enter your two-step code first, then try again" : "Couldn't delete: " + error.message); }
+    close(); try { await sb.auth.signOut(); } catch (e) {}
+    profile = null; session = null; rows = []; authEmail = ""; demoMfa.passed = false;
+    screenEmail(); toast("Your account and data have been deleted");
   };
 }
 $("meBtn").onclick = openSettings;

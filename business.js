@@ -135,6 +135,13 @@
     return ({ draft: ["Draft", "draft"], sent: ["Sent", "sent"], accepted: ["Accepted", "paid"], declined: ["Declined", "void"], invoiced: ["Invoiced", "part"] })[q.status] || [q.status, "sent"];
   }
   const pill = ([t, c]) => `<span class="bz-pill ${c}">${esc(t)}</span>`;
+  // Laptops get a proper table; phones keep the card rows. Both carry the same data-* so one wiring opens either.
+  const bzTable = (cols, body) => `<section class="gcard bz-card bz-tablewrap"><table class="bz-table"><thead><tr>${cols.map(([t, r]) => `<th${r ? ' class="r"' : ""}>${t}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></section>`;
+  const invCols = [["Date"], ["Number"], ["Customer"], ["Due"], ["Amount", 1], ["Balance", 1], ["Status"]];
+  const invTr = (i) => `<tr class="bz-tr" tabindex="0" data-inv="${i.id}"><td>${niceDate(i.date)}</td><td>${esc(i.number)}</td><td class="strong">${esc(cust(i.customer_id).name)}</td><td class="${isLate(i) ? "bz-late" : ""}">${i.status === "draft" || i.status === "void" || i.status === "paid" ? "—" : i.due_date ? niceDate(i.due_date) : "—"}</td><td class="r">${K(i.total_kobo)}</td><td class="r">${isOpen(i) ? K(balance(i)) : "—"}</td><td>${pill(invStatus(i))}</td></tr>`;
+  const quoteCols = [["Date"], ["Number"], ["Customer"], ["Valid to"], ["Amount", 1], ["Status"]];
+  const quoteTr = (q) => `<tr class="bz-tr" tabindex="0" data-q="${q.id}"><td>${niceDate(q.date)}</td><td>${esc(q.number)}</td><td class="strong">${esc(cust(q.customer_id).name)}</td><td>${q.expiry_date ? niceDate(q.expiry_date) : "—"}</td><td class="r">${K(q.total_kobo)}</td><td>${pill(quoteStatus(q))}</td></tr>`;
+  const docBlock = (inv, l) => `<section class="gcard bz-card bz-docs bz-cardsonly">${l.map(inv ? invRow : quoteRow).join("")}</section>` + (inv ? bzTable(invCols, l.map(invTr).join("")) : bzTable(quoteCols, l.map(quoteTr).join("")));
   function invSub(inv) {
     if (inv.status === "draft") return "Draft";
     if (inv.status === "void") return "Void";
@@ -230,6 +237,7 @@
     if (!["home", "expenses", "docs", "quotes", "more", "customers", "items", "reports", "banks", "purchases", "vendors"].includes(S.tab)) S.tab = "home";
     document.querySelectorAll("#tabbar .bz-tab").forEach((b) => b.classList.toggle("on", b.dataset.bt === tabOf(S.tab)));
     const v = $("view");
+    document.body.classList.toggle("bz-home", S.tab === "home");
     // Expenses: Egom's own calendar and records (receipts, WhatsApp, statements), for the business ledger
     if (S.tab === "expenses") { v.dataset.tab = "tx"; return E().renderExpenses(); }
     // Banks: Egom's own accounts page (balances, moves between accounts), for the business ledger
@@ -411,11 +419,11 @@
     if (raw.replace(/ /g, "").length >= 3) {
       const invs = S.invoices.filter((d) => docMatches(d, raw)), qs = S.quotes.filter((d) => docMatches(d, raw));
       const first = inv ? [["Invoices", invs, invRow], ["Quotes", qs, quoteRow]] : [["Quotes", qs, quoteRow], ["Invoices", invs, invRow]];
-      return invs.length || qs.length ? first.filter(([, l]) => l.length).map(([t, l, row]) => `<h5 class="bz-h5">${t} · ${l.length}</h5><section class="gcard bz-card bz-docs">${l.map(row).join("")}</section>`).join("")
+      return invs.length || qs.length ? first.filter(([, l]) => l.length).map(([t, l, row]) => `<h5 class="bz-h5">${t} · ${l.length}</h5>${docBlock(row === invRow, l)}`).join("")
         : `<div class="bz-empty">No invoice or quote matches “${esc(S.docQuery.trim())}”.</div>`;
     }
     return `<div class="bz-chips" role="group" aria-label="Filter">${F.map(([k, l]) => `<button type="button" data-f="${k}" aria-pressed="${S.filter === k}" class="${S.filter === k ? "on" : ""}">${l}</button>`).join("")}</div>
-      ${shown.length ? `<section class="gcard bz-card bz-docs">${shown.map((d) => inv ? invRow(d) : quoteRow(d)).join("")}</section>`
+      ${shown.length ? docBlock(inv, shown)
         : `<div class="bz-empty">${list.length ? "Nothing here." : inv ? "No invoices yet. Tap New to make your first one." : "No quotes yet. A quote turns into an invoice in one tap."}</div>`}`;
   }
   function invRow(i) {
@@ -840,7 +848,8 @@
     return `
       <div class="bz-row bz-head"><h2>Customers</h2><button class="bz-btn primary sm" id="bzNewCust" type="button">${svg(P.plus, 16)} New</button></div>
       ${S.customers.length > 6 ? `<div class="bz-search">${svg(P.search, 18)}<input id="bzcQ" value="${esc(S.custQuery)}" placeholder="Search by name or phone" aria-label="Search customers"></div>` : ""}
-      ${list.length ? `<section class="gcard bz-card bz-docs">${list.map((c) => `<button class="bz-doc" type="button" data-c="${c.id}"><span class="bz-av">${esc(initials(c.name))}</span>
+      ${list.length ? bzTable([["Name"], ["Company"], ["Phone"], ["Email"], ["Invoices", 1], ["Owes you", 1]], list.map((c) => `<tr class="bz-tr" tabindex="0" data-c="${c.id}"><td class="strong"><span class="bz-tname"><span class="bz-av sm">${esc(initials(c.name))}</span>${esc(c.name)}</span></td><td>${esc(c.company || "—")}</td><td>${esc(c.phone || "—")}</td><td>${esc(c.email || "—")}</td><td class="r">${S.invoices.filter((i) => i.customer_id === c.id && i.status !== "void").length || "—"}</td><td class="r ${lateBy.has(c.id) ? "bz-late" : ""}">${owedBy.get(c.id) ? K(owedBy.get(c.id)) : "—"}</td></tr>`).join("")) : ""}
+      ${list.length ? `<section class="gcard bz-card bz-docs bz-cardsonly">${list.map((c) => `<button class="bz-doc" type="button" data-c="${c.id}"><span class="bz-av">${esc(initials(c.name))}</span>
         <span class="bz-grow"><b>${esc(c.name)}</b><small>${esc([c.company, c.phone].filter(Boolean).join(" · ") || "No phone yet")}</small></span>
         <span class="bz-end">${owedBy.get(c.id) ? `<b class="${lateBy.has(c.id) ? "bz-late" : ""}">${K(owedBy.get(c.id))}</b><small>owes you</small>` : ""}</span></button>`).join("")}</section>`
         : `<div class="bz-empty">${S.customers.length ? "No one matches that." : "No customers yet. Add the people and companies you bill."}</div>`}`;
@@ -1018,7 +1027,7 @@
         <div class="gcard"><p>Overdue</p><b class="${late.length ? "bz-late" : ""}">${shortK(late.reduce((a, p) => a + pBal(p), 0))}</b></div>
         <div class="gcard"><p>Paid · ${esc(new Date(ym + "-15").toLocaleDateString("en-GB", { month: "short" }))}</p><b>${shortK(paidMonth)}</b></div></div>
       <div class="bz-chips" role="group" aria-label="Filter">${F.map(([k, l]) => `<button type="button" data-f="${k}" aria-pressed="${S.filter === k}" class="${S.filter === k ? "on" : ""}">${l}</button>`).join("")}</div>
-      ${shown.length ? `<section class="gcard bz-card bz-docs">${shown.map(purchaseRow).join("")}</section>`
+      ${shown.length ? `<section class="gcard bz-card bz-docs bz-cardsonly">${shown.map(purchaseRow).join("")}</section>` + bzTable([["Date"], ["Number"], ["Vendor"], ["Due"], ["Amount", 1], ["Balance", 1], ["Status"]], shown.map((p) => `<tr class="bz-tr" tabindex="0" data-pu="${p.id}"><td>${niceDate(p.date)}</td><td>${esc(p.number || "—")}</td><td class="strong">${esc(ven(p.vendor_id).name)}</td><td class="${pLate(p) ? "bz-late" : ""}">${p.status !== "paid" && p.due_date ? niceDate(p.due_date) : "—"}</td><td class="r">${K(p.total_kobo)}</td><td class="r">${pOpen(p) ? K(pBal(p)) : "—"}</td><td>${pill(pStatus(p))}</td></tr>`).join(""))
         : `<div class="bz-empty">${S.purchases.length ? "Nothing here." : "No purchases yet. Record what you buy from suppliers, paid now or on credit."}</div>`}
       <button class="bz-dashed" id="bzToVen" type="button">${svg(P.people, 16)} Vendors (${S.vendors.filter((v) => !v.archived).length})</button>`;
   }
@@ -1668,6 +1677,7 @@
   let cssDone = false;
   function injectCss() {
     if (cssDone) return; cssDone = true;
+    document.addEventListener("keydown", (e) => { const tr = e.target.closest && e.target.closest("tr.bz-tr"); if (tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); tr.click(); } });
     // "More" menus on invoice, quote and purchase sheets
     document.addEventListener("click", (e) => {
       const btn = e.target.closest(".bz-morebtn");
@@ -1738,6 +1748,18 @@
 .bz-chips button.on{background:var(--accent);color:var(--on-lime);box-shadow:none}
 .bz-chips.small{flex-wrap:wrap;margin:6px 0}
 .bz-docs{padding:4px 18px}
+.bz-tablewrap{display:none;padding:0;overflow:hidden}
+.bz-table{width:100%;border-collapse:collapse;font-size:14px}
+.bz-table th{text-align:left;font-size:12px;font-weight:700;color:var(--muted);padding:10px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+.bz-table td{padding:11px 16px;border-bottom:1px solid var(--grid);white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.bz-table tr:last-child td{border-bottom:0}
+.bz-table tbody tr{cursor:pointer}
+.bz-table tbody tr:hover,.bz-table tbody tr:focus-visible{background:var(--grid);outline:none}
+.bz-table .r{text-align:right;font-variant-numeric:tabular-nums}
+.bz-table .strong{font-weight:600}
+.bz-tname{display:inline-flex;align-items:center;gap:10px}
+.bz-av.sm{width:28px;height:28px;font-size:11px;flex:0 0 28px}
+@media (min-width:1024px){.bz-tablewrap{display:block}.bz-cardsonly{display:none}}
 .bz-doc{display:flex;align-items:center;gap:12px;width:100%;padding:14px 0;border:0;border-top:1px solid var(--line);background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
 .bz-docs .bz-doc:first-child,.bz-panel .bz-doc:first-of-type{border-top:0}
 .bz-doc b{display:block;font-size:15px}.bz-doc small{display:block;font-size:12px;color:var(--muted);margin-top:3px}
