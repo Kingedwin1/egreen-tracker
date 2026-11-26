@@ -1286,6 +1286,18 @@ function nameFrom(s        )         {
   // OCR can tack a stray letter or two onto the end
   return t.replace(/\s+[a-z]$/i, "").slice(0, 80);
 }
+// A long name printed on two lines ("EGREEN INNOVATIVE" / "CONCEPT LTD") is read as two lines,
+// and the first half can even land above the label. A line counts as the other half when it's
+// just a name in capitals: no label, no digits, no bank, nothing like "Successful".
+const NOT_NAME = /\b(successful|success|receipt|transaction|transfer|details|amount|status|completed|pending|failed|reference|session|date|time|narration|remark|description|disclaimer|bank|account|wallet|payment|paid|sent|received|share|download)\b/i;
+const isCaps = (s        ) => /[A-Z]/.test(s) && s === s.toUpperCase();
+function looseName(l                    )         {
+  if (!l || /[:\d|@]/.test(l) || bankIn(l) || NOT_NAME.test(l)) return "";
+  if (STOP_LABEL.test(l) || SENDER_LABEL.test(l) || RECIP_LABEL.test(l)) return "";
+  const t = l.replace(/[^A-Za-z&.,'\- ]/g, " ").replace(/\s+/g, " ").trim();
+  return t.split(" ").length <= 5 && t.length >= 2 && isCaps(t) ? t : "";
+}
+const labelOnly = (l                    ) => !!l && (SENDER_LABEL.test(l) || RECIP_LABEL.test(l) || STOP_LABEL.test(l)) && l.replace(SENDER_LABEL, "").replace(RECIP_LABEL, "").replace(/^[^:]*:/, "").trim().length < 2;
 function block(lines          , label        , bankLabel        )        {
   let name = "", bank = "";
   for (let i = 0; i < lines.length; i++) {
@@ -1293,7 +1305,26 @@ function block(lines          , label        , bankLabel        )        {
     if (bankLabel.test(l)) { const b = bankIn(l.replace(bankLabel, "")) || bankIn(lines[i + 1] ?? ""); if (b) bank = b; continue; }
     const m = l.match(label);
     if (!m || name) continue;
-    const rest = l.slice(m[0].length).trim();
+    let rest = l.slice(m[0].length).trim();
+    const restName = nameFrom(rest);
+    // a following label that carries a name of its own (not "Recipient Bank: FCMB" or "Account: 0123…")
+    const isLabelWithValue = (x                    ) => {
+      if (!x || SENDER_BANK.test(x) || RECIP_BANK.test(x)) return false;
+      const mm = x.match(SENDER_LABEL) ?? x.match(RECIP_LABEL);
+      return !!mm && nameFrom(x.slice(mm[0].length)).length >= 3 && !bankIn(x.slice(mm[0].length));
+    };
+    if (restName && isCaps(restName)) {
+      // the first half above the label (only if that line isn't another label's value)
+      const before = looseName(lines[i - 1]);
+      if (before && !labelOnly(lines[i - 2])) rest = `${before} ${rest}`;
+      // the second half below it, unless it's really the first half of the next label's name
+      const after = looseName(lines[i + 1]);
+      if (after && !isLabelWithValue(lines[i + 2])) rest = `${rest} ${after}`;
+    } else if (!restName) {
+      // label on its own line: the name may take the next two lines
+      const a1 = looseName(lines[i + 1]), a2 = a1 ? looseName(lines[i + 2]) : "";
+      if (a1) rest = a2 && !isLabelWithValue(lines[i + 3]) ? `${a1} ${a2}` : a1;
+    }
     const window = [rest, ...lines.slice(i + 1, i + 4).filter((x, k, arr) => !arr.slice(0, k + 1).some((y) => STOP_LABEL.test(y) || SENDER_LABEL.test(y) || RECIP_LABEL.test(y)))];
     for (const w of window) {
       if (!name) { const n = nameFrom(w); if (n.length >= 3 && /[a-z]{2}/i.test(n)) name = n; }
@@ -1330,7 +1361,21 @@ function parseReceiptText(text        , today        , opts            = {})    
 
   // Which way did the money go? Names first: if the receiver is you, it's money in.
   const mine = [opts.personalName ?? "", opts.businessName ?? "", ...(opts.extraNames ?? [])].filter((n) => n.trim());
-  const senderMe = nameMatches(sender.name, mine), recipMe = nameMatches(recip.name, mine);
+  let senderMe = nameMatches(sender.name, mine), recipMe = nameMatches(recip.name, mine);
+  // Your name is on the receipt but the layout hid which side it's on: go by the nearest label
+  if (!senderMe && !recipMe && mine.length) {
+    const spots                     = [];
+    lines.forEach((x, j) => { if (nameMatches(x, mine)) spots.push([j, x]); });
+    if (!spots.length) lines.forEach((x, j) => { const two = `${x} ${lines[j + 1] ?? ""}`; if (!spots.length && nameMatches(two, mine)) spots.push([j, two]); });
+    for (const [j, hit] of spots) {
+      const near = (re        ) => { let d = 99; lines.forEach((x, k) => { if (re.test(x) && !SENDER_BANK.test(x) && !RECIP_BANK.test(x)) d = Math.min(d, Math.abs(k - j) + (k > j ? 0.5 : 0)); }); return d; };
+      const ds = near(SENDER_LABEL), dr = near(RECIP_LABEL);
+      if (Math.min(ds, dr) > 3) break;
+      const who = nameFrom(hit);
+      if (dr < ds) { recipMe = true; recip.name = who; } else { senderMe = true; sender.name = who; }
+      break;
+    }
+  }
   const creditWords = /\b(money received|you received|you have received|received from|credit alert|credited|incoming|inward|deposit|cr\b|credit transaction|payment received|transfer received|you got)\b/i.test(flat);
   const debitWords = /\b(debit alert|debited|you sent|you paid|transfer successful|transfer to|sent to|paid to|outward|withdrawal|purchase|airtime|data bundle|bill payment|pos purchase|dr\b|debit transaction)\b/i.test(flat);
   let direction                                 , sure = true;
@@ -3578,7 +3623,7 @@ function wireInstallCard() {
 /* ============ ADD: screenshots, statements, typed entries ============ */
 const PN = () => profile?.full_name || "";
 const BN = () => (hasBiz() ? profile.business_name || "" : "");
-const parseOpts = () => ({ preset: profile?.business_preset || "general", businessName: BN() });
+const parseOpts = () => ({ preset: profile?.business_preset || "general", businessName: BN(), personalName: PN() });
 // Words that mark something as the business in a typed entry: "business", "biz", or the business's own name
 function bizRegex() {
   const own = EX.norm(BN()).split(" ").filter((w) => w.length > 2 && !["ltd", "limited", "the", "and"].includes(w));
@@ -3615,7 +3660,7 @@ async function getRules() {
 
 // Turn a parsed transaction into an editable draft
 function toDraft(d, space, rules) {
-  const kindFromDir = d.direction === "credit" ? "income" : "expense";
+  const kindFromDir = d.direction === "credit" ? "income" : d.direction === "transfer" ? "transfer" : "expense";
   const sp = hasBiz() ? (space || "personal") : "personal";
   // Money moved between your own accounts isn't spending
   const own = sp === "personal" ? !!PN() && EX.spaceFromOwner(d.counterparty, PN(), "") === "personal" : !!BN() && EX.spaceFromOwner(d.counterparty, "", BN()) === "business";
@@ -3875,8 +3920,8 @@ async function saveDrafts() {
   const payload = chosen.map((x) => ({
     batch_id: batch, sender: me, source: draftSource, status: "saved", space: x.space, kind: x.kind,
     tx_date: x.date, tx_time: x.d.time || null, amount: x.amount, fee: x.d.fee || 0, currency: "NGN",
-    counterparty: x.counterparty || null, narration: x.d.narration || null, reference: x.d.reference || null, bank: x.d.bank || null,
-    category: x.category, category_personal: x.d.category_personal, category_business: x.d.category_business, confidence: x.d.confidence,
+    counterparty: x.counterparty || null, narration: x.d.narration || null, reference: x.d.reference || null, bank: x.d.bank || null, to_bank: x.kind === "transfer" ? (x.d.to_bank || null) : null,
+    category: x.kind === "transfer" ? null : x.category, category_personal: x.d.category_personal, category_business: x.d.category_business, confidence: x.d.confidence,
   }));
   $("rSave").disabled = true; $("rSave").textContent = "Saving…";
   if (demo) {
