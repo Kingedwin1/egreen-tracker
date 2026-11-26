@@ -891,9 +891,13 @@ html,body{background:var(--bg)}
 .lf-sum b{margin-left:auto;font-size:15px;color:var(--ink)}
 .lf-sum .btn{padding:5px 12px;font-size:12.5px}
 .lf-tablewrap{display:none;padding:0;overflow:hidden}
-.lf-table{width:100%;border-collapse:collapse;font-size:14px}
+.lf-table{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
+.lf-table .c-date{width:78px}.lf-table .c-who{width:32%}.lf-table .c-acct{width:118px}.lf-table .c-amt{width:128px}.lf-table col.c-note{width:20%}
 .lf-table th{text-align:left;font-size:12px;font-weight:700;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
-.lf-table td{padding:11px 14px;border-bottom:1px solid var(--grid);vertical-align:middle;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-table td{padding:11px 14px;border-bottom:1px solid var(--grid);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-table td.r b{font-size:14.5px;font-variant-numeric:tabular-nums}
+.lf-cat{display:flex;max-width:100%;min-width:0}
+.lf-cat>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .lf-table tr:last-child td{border-bottom:0}
 .lf-table tbody tr{cursor:pointer}
 .lf-table tbody tr:hover,.lf-table tbody tr:focus-visible{background:var(--grid);outline:none}
@@ -907,6 +911,7 @@ html,body{background:var(--bg)}
   .lf-tablewrap{display:block}
   .lf-cards{display:none}
 }
+@media (min-width:1024px) and (max-width:1279px){.lf-table .c-note{display:none}.lf-table col.c-note{width:0}}
 </style>
 </head>
 <body><div id="blobs" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i></div>
@@ -1704,7 +1709,7 @@ function render() {
 }
 
 /* ============ Egom Business (business.js): invoices, quotes, customers, reports ============ */
-const BIZ_VERSION = "16";   // raise with every business.js update so phones fetch the new copy
+const BIZ_VERSION = "17";   // raise with every business.js update so phones fetch the new copy
 let bizLoading = null;
 function loadBusiness() {
   if (window.EgomBusiness) return Promise.resolve(window.EgomBusiness);
@@ -2081,6 +2086,8 @@ function renderTx() {
 let bizTxMode = (() => { try { return localStorage.getItem("egom_biz_txmode") || "list"; } catch (e) { return "list"; } })();
 const LF = { q: "", who: "", cat: "", acct: "", kind: "out", scope: "month" };
 const whoOf = (r) => (r.counterparty || "").trim();
+// Bank receipts often shout names in capitals; show them the way people write them
+const niceName = (t) => { t = String(t || "").replace(/\s+/g, " ").trim(); return t.length > 3 && t === t.toUpperCase() && /[A-Z]/.test(t) ? t.toLowerCase().replace(/(^|[\s\-'(\/.&])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\b(Ltd|Plc|Nig|Ng|Llc)\b/g, (m) => m === "Plc" ? "PLC" : m).replace(/\b(Aj|Gtb|Uba|Fcmb|Mtn|Dstv|Pos|Ikedc|Ekedc)\b/g, (m) => m.toUpperCase()) : t; };
 function listRows() {
   const base = (LF.scope === "all" ? rows.filter(inLedger) : monthRows(ym)).filter((r) => r.kind !== "transfer");
   const q = LF.q.trim().toLowerCase();
@@ -2091,10 +2098,10 @@ function listRows() {
 }
 function listView() {
   const pool = (LF.scope === "all" ? rows.filter(inLedger) : monthRows(ym)).filter((r) => r.kind !== "transfer" && (LF.kind === "all" || (LF.kind === "out" ? r.kind !== "income" : r.kind === "income")));
-  const uniq = (f) => [...new Set(pool.map(f).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const uniq = (f) => [...new Set(pool.map(f).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   const whos = uniq(whoOf), cats = uniq((r) => r.category), accts = uniq((r) => r.bank);
   [["who", whos], ["cat", cats], ["acct", accts]].forEach(([k, l]) => { if (LF[k] && !l.includes(LF[k])) LF[k] = ""; });
-  const sel = (id, label, all, list, v) => `<label class="lf-sel"><span>${label}</span><select id="${id}"><option value="">${all}</option>${list.map((x) => `<option${x === v ? " selected" : ""}>${esc(x)}</option>`).join("")}</select></label>`;
+  const sel = (id, label, all, list, v) => `<label class="lf-sel"><span>${label}</span><select id="${id}"><option value="">${all}</option>${list.map((x) => `<option value="${esc(x)}"${x === v ? " selected" : ""}>${esc(id === "lfWho" ? niceName(x) : x)}</option>`).join("")}</select></label>`;
   return `<div class="card lf">
       <div class="lf-top"><div class="lf-q">${icon("search")}<input id="lfQ" type="search" value="${esc(LF.q)}" placeholder="Search who, note, amount or reference" aria-label="Search records" autocomplete="off"></div>
         <div class="toggle">${[["out", "Spent"], ["in", "Received"], ["all", "All"]].map(([k, l]) => `<button type="button" data-lk="${k}" class="${LF.kind === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
@@ -2109,10 +2116,12 @@ function listOut() {
   if (!list.length) return sumLine + `<div class="empty">${rows.filter(inLedger).length ? "Nothing matches. Try another filter or All time." : "No records yet. Forward a receipt to Egom on WhatsApp, or tap + to add one."}</div>`;
   const amt = (r) => r.kind === "income" ? `<b class="inc">+${money(r.amount)}</b>` : `<b class="exp">-${money(spend(r))}</b>`;
   const shown = list.slice(0, 400);
-  const table = `<div class="card lf-tablewrap"><table class="lf-table"><thead><tr><th>Date</th><th>Vendor</th><th>Category</th><th>Account</th><th>Note</th><th class="r">Amount</th></tr></thead><tbody>
-    ${shown.map((r) => `<tr class="tx-tr" data-id="${r.id}" tabindex="0"><td>${esc(niceDay(r.tx_date))}</td><td class="strong">${esc(whoOf(r) || "—")}</td><td><span class="lf-cat"><i style="background:${colorOf(r.category)[1]}"></i>${esc(r.category || "")}</span></td><td>${esc(r.bank || "—")}</td><td class="muted">${esc([r.narration, r.note].filter(Boolean).join(" · ") || "")}</td><td class="r">${amt(r)}</td></tr>`).join("")}
+  const note = (r) => [r.narration, r.note].filter(Boolean).join(" · ");
+  const table = `<div class="card lf-tablewrap"><table class="lf-table"><colgroup><col class="c-date"><col class="c-who"><col class="c-cat"><col class="c-acct"><col class="c-note"><col class="c-amt"></colgroup>
+    <thead><tr><th>Date</th><th>Vendor</th><th>Category</th><th>Account</th><th class="c-note">Note</th><th class="r">Amount</th></tr></thead><tbody>
+    ${shown.map((r) => { const who = niceName(whoOf(r)); return `<tr class="tx-tr" data-id="${r.id}" tabindex="0"><td>${esc(niceDay(r.tx_date))}</td><td class="strong" title="${esc(who)}">${who ? esc(who) : `<span class="muted">${esc(note(r) || "No name")}</span>`}</td><td><span class="lf-cat" title="${esc(r.category || "")}"><i style="background:${colorOf(r.category)[1]}"></i><span>${esc(r.category || "")}</span></span></td><td>${esc(r.bank || "—")}</td><td class="muted c-note" title="${esc(note(r))}">${esc(who ? note(r) : "")}</td><td class="r">${amt(r)}</td></tr>`; }).join("")}
     </tbody></table></div>`;
-  const cards = `<div class="card lf-cards" style="padding:0">${shown.map((r) => txRow(r).replace('<div class="t2">', `<div class="t2">${esc(niceDay(r.tx_date))} · `)).join("")}</div>`;
+  const cards = `<div class="card lf-cards" style="padding:0">${shown.map((r) => txRow({ ...r, counterparty: niceName(r.counterparty) }).replace('<div class="t2">', `<div class="t2">${esc(niceDay(r.tx_date))} · `)).join("")}</div>`;
   return sumLine + table + cards + (list.length > shown.length ? `<p class="fine" style="text-align:center">Showing the latest ${shown.length}. Narrow the filters to see older ones.</p>` : "");
 }
 const niceDay = (d) => { const [y, m, dd] = (d || "").split("-").map(Number); return y ? new Date(y, m - 1, dd).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: y === now.getFullYear() ? undefined : "numeric" }) : ""; };

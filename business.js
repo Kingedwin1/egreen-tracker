@@ -136,7 +136,8 @@
   }
   const pill = ([t, c]) => `<span class="bz-pill ${c}">${esc(t)}</span>`;
   // Laptops get a proper table; phones keep the card rows. Both carry the same data-* so one wiring opens either.
-  const bzTable = (cols, body) => `<section class="gcard bz-card bz-tablewrap"><table class="bz-table"><thead><tr>${cols.map(([t, r]) => `<th${r ? ' class="r"' : ""}>${t}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></section>`;
+  const BZW = { Date: 84, Number: 136, Due: 84, "Valid to": 92, Amount: 124, Balance: 116, Status: 104, Phone: 140, Invoices: 84, "Owes you": 124 };
+  const bzTable = (cols, body) => `<section class="gcard bz-card bz-tablewrap"><table class="bz-table"><colgroup>${cols.map(([t]) => `<col${t === "Date" ? ' class="bz-c-date"' : ""}${BZW[t] ? ` style="width:${BZW[t]}px"` : ""}>`).join("")}</colgroup><thead><tr>${cols.map(([t, r]) => `<th class="${r ? "r" : ""}${t === "Date" ? " bz-c-date" : ""}">${t}</th>`).join("")}</tr></thead><tbody>${cols[0][0] === "Date" ? body.replace(/(<tr [^>]*>)<td>/g, '$1<td class="bz-c-date">') : body}</tbody></table></section>`;
   const invCols = [["Date"], ["Number"], ["Customer"], ["Due"], ["Amount", 1], ["Balance", 1], ["Status"]];
   const invTr = (i) => `<tr class="bz-tr" tabindex="0" data-inv="${i.id}"><td>${niceDate(i.date)}</td><td>${esc(i.number)}</td><td class="strong">${esc(cust(i.customer_id).name)}</td><td class="${isLate(i) ? "bz-late" : ""}">${i.status === "draft" || i.status === "void" || i.status === "paid" ? "—" : i.due_date ? niceDate(i.due_date) : "—"}</td><td class="r">${K(i.total_kobo)}</td><td class="r">${isOpen(i) ? K(balance(i)) : "—"}</td><td>${pill(invStatus(i))}</td></tr>`;
   const quoteCols = [["Date"], ["Number"], ["Customer"], ["Valid to"], ["Amount", 1], ["Status"]];
@@ -1749,13 +1750,17 @@
 .bz-chips.small{flex-wrap:wrap;margin:6px 0}
 .bz-docs{padding:4px 18px}
 .bz-tablewrap{display:none;padding:0;overflow:hidden}
-.bz-table{width:100%;border-collapse:collapse;font-size:14px}
-.bz-table th{text-align:left;font-size:12px;font-weight:700;color:var(--muted);padding:10px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
-.bz-table td{padding:11px 16px;border-bottom:1px solid var(--grid);white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.bz-table{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
+.bz-table th{text-align:left;font-size:12px;font-weight:700;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.bz-table td{padding:11px 12px;border-bottom:1px solid var(--grid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .bz-table tr:last-child td{border-bottom:0}
 .bz-table tbody tr{cursor:pointer}
 .bz-table tbody tr:hover,.bz-table tbody tr:focus-visible{background:var(--grid);outline:none}
 .bz-table .r{text-align:right;font-variant-numeric:tabular-nums}
+.bz-table th:first-child,.bz-table td:first-child{padding-left:18px}.bz-table th:last-child,.bz-table td:last-child{padding-right:18px}
+.bz-table .bz-pill{white-space:nowrap}
+@media (max-width:1279px){.bz-table .bz-c-date{display:none}}
+.bz-tname{max-width:100%;overflow:hidden}
 .bz-table .strong{font-weight:600}
 .bz-tname{display:inline-flex;align-items:center;gap:10px}
 .bz-av.sm{width:28px;height:28px;font-size:11px;flex:0 0 28px}
