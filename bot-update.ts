@@ -783,6 +783,7 @@ async function replySaved(p: Profile, to: string, filed: { row: Record<string, a
 
 // ---------------------------------------------------------------- handlers
 async function handleReceipt(p: Profile, from: string, msgId: string, bytes: Uint8Array, mime: string, caption: string, mediaId: string) {
+  // (caption is extended below with any line typed under the receipt)
   let text = "";
   try {
     text = await ocrSpace(OCR_KEY, bytes, mime, encodeBase64(bytes));
@@ -791,6 +792,8 @@ async function handleReceipt(p: Profile, from: string, msgId: string, bytes: Uin
     await sendText(from, "Sorry, I couldn't scan that one right now. Please send it again in a few minutes.");
     return;
   }
+  // Words typed with the receipt: the caption, plus any message that arrived while we were reading it
+  caption = [caption, ...(await takeNotes(from))].filter((x) => x && x.trim()).join(" · ").slice(0, 300);
   let parsed = parseReceiptText(text, todayISO(), parseOpts(p));
   // A second read with the other engine when the first one missed the amount or the people
   if (!parsed || (!parsed.counterparty && !parsed.other_party)) {
@@ -803,6 +806,10 @@ async function handleReceipt(p: Profile, from: string, msgId: string, bytes: Uin
   // The caption can say which way the money went: "payment from client", "income", "I paid"
   if (parsed && parsed.direction !== "transfer") {
     const c = normKey(caption);
+    // What it was for: the caption fills in when the receipt has no narration (OPay often has none)
+    const words = captionWords(p, caption);
+    if (words) parsed = { ...parsed, narration: parsed.narration ? `${parsed.narration} · ${words}`.slice(0, 200) : words.slice(0, 200) };
+    if (words) parsed = { ...parsed, ...cats(p, parsed.direction === "credit" ? "credit" : "debit", parsed.counterparty, `${words} ${parsed.narration}`) };
     const said = /\b(income|money in|received|recieved|paid me|sent me|payment from|from (?:a |my |the )?(?:customer|client)|customer paid|client paid|deposit from|sales?)\b/.test(c) ? "credit"
       : /\b(expense|money out|i paid|i sent|spent|paid to|payment to)\b/.test(c) ? "debit" : null;
     if (said && said !== parsed.direction) parsed = { ...parsed, direction: said, counterparty: parsed.other_party || parsed.counterparty, other_party: parsed.counterparty, bank: said === "credit" ? "" : parsed.bank, sure: true, ...cats(p, said, parsed.other_party || parsed.counterparty, parsed.narration) };
@@ -813,6 +820,39 @@ async function handleReceipt(p: Profile, from: string, msgId: string, bytes: Uin
     return;
   }
   await saveBatch(p, from, msgId, [cleanTx(p, parsed)], caption, "whatsapp", mediaId);
+  // A message that landed while we were saving still belongs to this receipt
+  const late = await takeNotes(from);
+  if (late.length) await addNote(p, from, late.join(" · "), true);
+}
+
+// ---------------------------------------------------------------- words sent with a receipt
+// WhatsApp delivers a forwarded receipt and the line typed under it as two separate messages,
+// often at the same moment. While a receipt is being read we leave a marker; a text that arrives
+// then is parked as a note and picked up by the receipt, so it's read with it.
+const READ_MARK = (from: string, id: string) => `reading:${from}:${id}`;
+async function markReceipt(from: string, id: string, on: boolean) {
+  if (on) await sb.from("processed_messages").insert({ wa_message_id: READ_MARK(from, id) });
+  else await sb.from("processed_messages").delete().eq("wa_message_id", READ_MARK(from, id));
+}
+async function receiptBeingRead(from: string) {
+  const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const { data } = await sb.from("processed_messages").select("wa_message_id").like("wa_message_id", `reading:${from}:%`).gte("created_at", since).limit(1);
+  return !!data?.length;
+}
+async function parkNote(from: string, text: string) {
+  await sb.from("processed_messages").insert({ wa_message_id: `note:${from}:${Date.now()}:${crypto.randomUUID().slice(0, 8)}:${text.slice(0, 500)}` });
+}
+async function takeNotes(from: string): Promise<string[]> {
+  const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { data } = await sb.from("processed_messages").select("wa_message_id").like("wa_message_id", `note:${from}:%`).gte("created_at", since);
+  const ids = (data ?? []).map((r: Record<string, string>) => r.wa_message_id).sort();
+  for (const id of ids) await sb.from("processed_messages").delete().eq("wa_message_id", id);
+  return ids.map((id: string) => id.split(":").slice(4).join(":")).filter(Boolean);
+}
+// The caption without ledger words ("egreen", "personal", "biz"), so what's left is what it was for
+function captionWords(p: Profile, caption: string) {
+  const own = bizWords(p);
+  return caption.split(/\s+/).filter((w) => !new RegExp(`^(${["personal", "biz", "business", ...own].join("|")})[.,!]?$`, "i").test(w)).join(" ").replace(/^[\s·,:-]+|[\s·,:-]+$/g, "").trim();
 }
 
 // Categories for a corrected direction
@@ -934,23 +974,38 @@ function help(p: Profile) {
 Everything is also at ${APP_URL}`;
 }
 
-async function addNote(p: Profile, from: string, note: string) {
+async function addNote(p: Profile, from: string, note: string, quiet = false) {
   const { id, rows, at } = await lastBatch(p, from);
   if (!id || !rows.length || !at) return false;
   if (Date.now() - new Date(at).getTime() > 30 * 60 * 1000) return false; // only within 30 minutes
   const clean = note.trim().slice(0, 200);
+  const words = captionWords(p, clean);
+  const c = normKey(clean);
+  const said = /\b(income|money in|received|recieved|paid me|sent me|payment from|from (?:a |my |the )?(?:customer|client)|customer paid|client paid|deposit from)\b/.test(c) ? "income"
+    : /\b(expense|money out|i paid|i sent|paid to|payment to)\b/.test(c) ? "expense" : null;
+  if (said && rows.some((r) => r.kind !== "transfer" && r.kind !== said)) await flipBatch(p, from, id, said);
+  const { rows: fresh } = await lastBatch(p, from);
   let changed = "";
-  for (const r of rows) {
-    const newNote = r.note ? `${r.note}; ${clean}` : clean;
-    const patch: Record<string, unknown> = { note: newNote, updated_at: new Date().toISOString() };
-    if (r.space) {
-      const c = categorize(r.space as Space, clean, p.business_preset);
-      const mc = mapCat(p, r.space as Space, c.category, r.kind);
-      if (c.score > 0 && mc && mc !== r.category) { patch.category = mc; changed = mc; }
+  for (const r of fresh) {
+    const patch: Record<string, unknown> = { note: r.note ? `${r.note}; ${clean}` : clean, updated_at: new Date().toISOString() };
+    if (!r.narration && words) patch.narration = words;
+    if (r.kind !== "transfer" && words) {
+      const basis = `${words} ${r.narration ?? ""}`;
+      const c2 = cats(p, r.kind === "income" ? "credit" : "debit", r.counterparty ?? "", basis);
+      const hit = r.kind === "income" ? true : categorize("personal", basis).score > 0 || categorize("business", basis, p.business_preset).score > 0;
+      if (hit) Object.assign(patch, c2);
+      if (r.space && hit) {
+        const sp = r.space as Space;
+        const mc = mapCat(p, sp, sp === "business" ? c2.category_business : c2.category_personal, r.kind);
+        if (mc && mc !== r.category) { patch.category = mc; changed = mc; }
+      }
     }
     await sb.from("expenses").update(patch).eq("id", r.id).eq("user_id", p.user_id);
   }
-  await sendText(from, `Note added: "${clean}"${changed ? `\nCategory updated to *${changed}*.` : ""}`);
+  const pending = fresh.some((r) => !r.space);
+  if (quiet && pending) return true; // the ledger question is still open; it'll show the note when answered
+  const flipped = said ? `\nSaved as *${said === "income" ? "money in" : "money out"}*.` : "";
+  await sendText(from, `Note added: "${clean}"${changed ? `\nCategory updated to *${changed}*.` : ""}${flipped}`);
   return true;
 }
 
@@ -1014,7 +1069,17 @@ async function handleText(p: Profile, from: string, msgId: string, text: string)
     if (id && rows.some((r) => r.status === "pending")) return replySaved(p, from, await fileBatch(p, id, typed), typed);
   }
 
-  if (/\b(summary|total|totals|report|spent|spend)\b/.test(n)) return handleSummary(p, from, t);
+  if (/^(?:summary|total|totals|report)\b|\b(how much|what did i|this month|last month)\b/.test(n) || (/\b(spent|spend)\b/.test(n) && !/\d/.test(n))) return handleSummary(p, from, t);
+
+  // Typed under a forwarded receipt: it arrives as its own message, often while the receipt is still being read
+  if (!(await receiptBeingRead(from))) await new Promise((r) => setTimeout(r, 1500)); // the receipt may land a moment later
+  if (await receiptBeingRead(from)) { await parkNote(from, t); return; }
+  const recent = await lastBatch(p, from);
+  if (recent.id && recent.at && Date.now() - new Date(recent.at).getTime() < 90 * 1000 && recent.rows.some((r) => r.source === "whatsapp")) {
+    // Unless it's clearly a different amount, a line sent right after a receipt describes that receipt
+    const typed = parseManual(t, todayISO(), parseOpts(p));
+    if (!typed || recent.rows.some((r) => Math.abs(Number(r.amount) - typed.amount) < 1)) { if (await addNote(p, from, t)) return; }
+  }
 
   if (await handleManual(p, from, msgId, t)) return;
 
@@ -1050,7 +1115,8 @@ async function handleMessage(msg: Record<string, any>) {
       if (!["application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp", "image/tiff"].includes(mime)) {
         return sendText(from, "Please send the receipt as a photo/screenshot (JPG or PNG) or a PDF.");
       }
-      await handleReceipt(p, from, msg.id, bytes, mime, caption, media.id);
+      await markReceipt(from, msg.id, true);
+      try { await handleReceipt(p, from, msg.id, bytes, mime, caption, media.id); } finally { await markReceipt(from, msg.id, false); }
     } catch (e) {
       if (String(e).includes("too_large")) return sendText(from, `That file is over 1 MB, the scanner's limit. Send it as a normal photo or screenshot so WhatsApp shrinks it. Bank statements go in at ${APP_URL} instead.`);
       console.error(e);
