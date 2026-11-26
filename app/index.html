@@ -928,17 +928,6 @@ html,body{background:var(--bg)}
 @media (min-width:1024px) and (max-width:1279px){.lf-table .c-note{display:none}.lf-table col.c-note{width:0}}
 @media (min-width:1280px){.lf-table .c-who{width:26%}.lf-table col.c-note{width:18%}}
 
-/* Face ID / fingerprint lock */
-.lock{position:fixed;inset:0;z-index:1000;background:var(--bg);display:grid;place-items:center;padding:24px;padding-bottom:calc(24px + env(safe-area-inset-bottom))}
-.lock.hidden{display:none}
-.lock-in{width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px}
-.lock-logo{margin-bottom:18px}
-.lock-h{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em}
-.lock-p{margin:0 0 18px;color:var(--ink-2)}
-.lock .btn{width:100%}
-.lock-err{margin:6px 0 0;color:var(--ink-2);font-size:13px}
-.lock-out{margin-top:18px;color:var(--muted)}
-html.is-locked body{overflow:hidden}
 </style>
 </head>
 <body><div id="blobs" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i></div>
@@ -1885,11 +1874,12 @@ const fetchData = () => Promise.all([
 
 /* Opening fast: the last copy of your records is kept on this device and shown at once,
    then replaced with fresh data a moment later. Not kept for accounts with two-step verification. */
-const SNAP = "egom-snap-";   // see also the device lock below: with it on, two-step accounts keep the copy too
+const SNAP = "egom-snap-";
 let quickPainted = false;
 const hasMfa = (s) => !!(s && s.user && (s.user.factors || []).some((f) => f.status === "verified"));
 function saveSnap() {
-  if (demo || !session || !profile || !rowsLoaded || (hasMfa(session) && !lockInfo(session.user.id))) return;
+  if (demo || !session || !profile || !rowsLoaded) return;
+  if (hasMfa(session)) { try { localStorage.removeItem(SNAP + session.user.id); } catch {} return; }
   try { localStorage.setItem(SNAP + session.user.id, JSON.stringify({ at: Date.now(), profile, rows, budgets })); }
   catch { try { localStorage.removeItem(SNAP + session.user.id); } catch {} }
 }
@@ -1900,7 +1890,8 @@ function storedSession() {
 // Paint the app from the saved copy before anything has loaded from the internet
 function paintFromSnap() {
   const s = storedSession();
-  if (!s || !s.user || (hasMfa(s) && !lockInfo(s.user.id))) return false;
+  if (!s || !s.user) return false;
+  if (hasMfa(s)) { try { localStorage.removeItem(SNAP + s.user.id); } catch {} return false; }
   let snap = null; try { snap = JSON.parse(localStorage.getItem(SNAP + s.user.id) || "null"); } catch {}
   if (!snap || !snap.profile || !snap.profile.onboarded || !Array.isArray(snap.rows)) return false;
   session = s; profile = snap.profile; rows = snap.rows; budgets = snap.budgets || {};
@@ -1914,7 +1905,7 @@ let lastSig = "";
 function rowsSig() { let m = ""; for (const r of rows) if ((r.updated_at || "") > m) m = r.updated_at; return rows.length + "|" + m; }
 let checking = false;
 async function refreshIfChanged() {
-  if (demo || !sb || !session || !rowsLoaded || document.hidden || checking || locked) return;
+  if (demo || !sb || !session || !rowsLoaded || document.hidden || checking) return;
   if ($("sheetRoot") && $("sheetRoot").innerHTML) return;   // don't redraw under an open form
   checking = true;
   try {
@@ -1924,7 +1915,7 @@ async function refreshIfChanged() {
 }
 
 /* App updates: when a new version is on egom.ng, switch to it the next time you come back to the app */
-const BUILD = "a522a180eaf2";
+const BUILD = "446754ca0e4c";
 let updateWaiting = false;
 async function checkForUpdate() {
   if (demo || BUILD.startsWith("__") || !location.pathname.startsWith("/app")) return;
@@ -1935,7 +1926,7 @@ async function checkForUpdate() {
   } catch {}
 }
 function updateNowIfSafe() {
-  if (!updateWaiting || locked) return false;
+  if (!updateWaiting) return false;
   const busyTyping = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
   if (($("sheetRoot") && $("sheetRoot").innerHTML) || busyTyping) return false;
   location.reload(); return true;
@@ -3502,7 +3493,7 @@ function openDataSheet() {
     if (demo) { close(); return toast("Preview only: nothing was deleted"); }
     $("dDel").disabled = true; $("dDel").textContent = "Deleting…";
     const { error } = await sb.rpc("egom_delete_my_account", { p_confirm: v });
-    if (!error) { clearSnaps(); turnOffLock(); }
+    if (!error) clearSnaps();
     if (error) { $("dDel").disabled = false; $("dDel").textContent = "Delete everything for good"; return toast(/authenticator|two-step|aal/i.test(error.message) ? "Enter your two-step code first, then try again" : "Couldn't delete: " + error.message); }
     close(); try { await sb.auth.signOut(); } catch (e) {}
     profile = null; session = null; rows = []; authEmail = ""; demoMfa.passed = false;
@@ -3522,9 +3513,7 @@ $("sideMe").onclick = openSettings;
 // ---- Start ------------------------------------------------------------------------------
 async function start() {
   const live = SUPABASE_KEY && !SUPABASE_KEY.startsWith("__");
-  const isDoc = !!new URLSearchParams(location.search).get("doc");
-  if (live && !isDoc) { const s0 = storedSession(); if (s0 && s0.user && lockInfo(s0.user.id)) showLock(); }
-  const quick = live && !isDoc && paintFromSnap();
+  const quick = live && !new URLSearchParams(location.search).get("doc") && paintFromSnap();
   let createClient = null;
   if (live) { try { ({ createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm")); } catch {} }
   if (!createClient && quick) { toast("No connection. Showing your last saved records."); return; }
@@ -3546,7 +3535,7 @@ async function start() {
   sb.auth.onAuthStateChange((event, s) => {
     // Someone tapped the link in the email instead of typing the code
     if (event === "SIGNED_IN" && s && !session) { session = s; continueSignIn(); }
-    if (event === "SIGNED_OUT") { session = null; profile = null; clearSnaps(); turnOffLock(); }
+    if (event === "SIGNED_OUT") { session = null; profile = null; clearSnaps(); }
   });
   const { data } = await sb.auth.getSession();
   if (data.session) { session = data.session; prefetch = fetchData(); prefetch.catch(() => {}); setTimeout(checkForUpdate, 4000); return continueSignIn(); }
@@ -3555,87 +3544,8 @@ async function start() {
 }
 
 
-/* ============ Face ID / fingerprint lock (this device only) ============
-   Uses the phone's own screen lock through the browser (WebAuthn). Nothing is sent to Egom's servers:
-   it is a lock on this device, like a banking app's. The sign-in itself stays as it is. */
-const LOCK = "egom-lock";
-const LOCK_AFTER = 60 * 1000;   // away for longer than a minute: ask again
-const bioName = () => isIOS() ? (/iPad/.test(navigator.userAgent) ? "Touch ID or Face ID" : "Face ID") : /Macintosh/.test(navigator.userAgent) ? "Touch ID" : /android/i.test(navigator.userAgent) ? "fingerprint" : "your device's lock";
-const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-function lockInfo(uid) { try { const l = JSON.parse(localStorage.getItem(LOCK) || "null"); return l && (!uid || l.uid === uid) ? l : null; } catch { return null; } }
-async function canBio() {
-  try { return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch { return false; }
-}
-async function turnOnLock() {
-  const uid = session?.user?.id; if (!uid) return "Sign in first.";
-  try {
-    const cred = await navigator.credentials.create({ publicKey: {
-      challenge: crypto.getRandomValues(new Uint8Array(32)),
-      rp: { name: "Egom", id: location.hostname },
-      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: (profile?.email || "you") + " (app lock)", displayName: "Egom app lock" },
-      pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
-      authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "discouraged" },
-      timeout: 60000, attestation: "none",
-    } });
-    if (!cred) return "Couldn't set it up.";
-    localStorage.setItem(LOCK, JSON.stringify({ uid, id: b64u(cred.rawId), at: Date.now() }));
-    saveSnap();
-    return null;
-  } catch (e) { return /NotAllowed|Abort/i.test(e.name) ? "Cancelled." : "Couldn't set it up: " + (e.message || e); }
-}
-function turnOffLock() { try { localStorage.removeItem(LOCK); } catch {} hideLock(); }
-const fromB64u = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
-let locked = false, lockFails = 0;
-function showLock() {
-  if (locked) return; locked = true;
-  let el = $("lockScreen");
-  if (!el) { el = document.createElement("div"); el.id = "lockScreen"; el.className = "lock"; document.body.appendChild(el); }
-  el.innerHTML = `<div class="lock-in">
-      <div class="lock-logo">${logoHTML(34)}</div>
-      <p class="lock-h">Egom is locked</p>
-      <p class="lock-p">Use ${esc(bioName())} to open your records.</p>
-      <button class="btn primary big" id="lockGo" type="button">Unlock with ${esc(bioName())}</button>
-      <p class="lock-err hidden" id="lockErr"></p>
-      <button class="linkbtn lock-out" id="lockOut" type="button">Sign out instead</button>
-    </div>`;
-  el.classList.remove("hidden");
-  document.documentElement.classList.add("is-locked");
-  $("lockGo").onclick = unlock;
-  $("lockOut").onclick = async () => {
-    const b = $("lockOut"); if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Tap again to sign out"; return; }
-    turnOffLock(); clearSnaps(); try { if (sb) await sb.auth.signOut(); } catch {}
-    session = null; profile = null; location.reload();
-  };
-}
-function hideLock() {
-  locked = false; lockFails = 0;
-  const el = $("lockScreen"); if (el) { el.classList.add("hidden"); el.innerHTML = ""; }
-  document.documentElement.classList.remove("is-locked");
-}
-async function unlock() {
-  const l = lockInfo(); if (!l) return hideLock();
-  const btn = $("lockGo"); if (btn) btn.disabled = true;
-  try {
-    const ok = await navigator.credentials.get({ publicKey: {
-      challenge: crypto.getRandomValues(new Uint8Array(32)), rpId: location.hostname,
-      allowCredentials: [{ type: "public-key", id: fromB64u(l.id) }], userVerification: "required", timeout: 60000,
-    } });
-    if (ok) { hideLock(); refreshIfChanged(); return; }
-  } catch (e) {
-    lockFails++;
-    const err = $("lockErr");
-    if (err) { err.textContent = lockFails >= 2 ? `Still not working? Sign out below and sign in again with your email. You can turn ${bioName()} back on in Account.` : "That didn't work. Try again."; err.classList.remove("hidden"); }
-  }
-  if (btn) btn.disabled = false;
-}
-// Leaving the app hides your records at once (so they don't show in the app switcher);
-// coming back within a minute opens straight away, after that it asks for Face ID again.
-let lockHiddenAt = 0;
-document.addEventListener("visibilitychange", () => {
-  const l = session && lockInfo(session.user.id); if (!l) return;
-  if (document.hidden) { lockHiddenAt = Date.now(); if (!locked) { showLock(); locked = "soft"; } return; }
-  if (locked === "soft") { if (Date.now() - lockHiddenAt < LOCK_AFTER) hideLock(); else locked = true; }
-});
+// The Face ID lock was tried and taken out: tidy up what it left on phones that had it on
+try { localStorage.removeItem("egom-lock"); } catch {}
 
 /* ============ APP: add to home screen, offline, notifications ============ */
 const VAPID_PUBLIC = "BCfpS1aXNf-zyEIhn0FfbR1fQ0mI-rp6x3VtxhKTTJznkol6z4Lcdn3_rNSen48xifoZohzy9TMAZrQfg2oQoj4";
@@ -3731,26 +3641,10 @@ async function openSecurity(focus) {
       <input id="pwNew2" type="password" autocomplete="new-password" placeholder="Type it again">
       <button class="btn primary" id="pwSave" type="submit">${hasPw ? "Change password" : "Save password"}</button>
     </form>
-    <div id="bioRow"></div>
     <label style="margin-top:22px">Two-step verification</label>
     <div class="wa-row"><span>${factor ? `${icon("check")} On: authenticator app` : "Off"}</span><button class="btn ${factor ? "" : "primary"}" id="mfaToggle">${factor ? "Turn off" : "Turn on"}</button></div>
     <p class="fine">${factor ? "Each time you sign in, Egom also asks for the 6-digit code from your authenticator app." : "Adds a second lock: after your password or email code, Egom asks for a 6-digit code from an app on your phone, like Google Authenticator."}</p>`);
   if (focus === "password") { toast("Choose a new password"); setTimeout(() => $("pwNew") && $("pwNew").focus(), 50); }
-  // Face ID / fingerprint lock: only on devices that have one
-  canBio().then((ok) => {
-    const row = $("bioRow"); if (!row || (!ok && !lockInfo(session?.user?.id))) return;
-    const on = !!lockInfo(session?.user?.id), name = bioName();
-    row.innerHTML = `<label style="margin-top:22px">Lock with ${esc(name)}</label>
-      <div class="wa-row"><span>${on ? `${icon("check")} On, on this device` : "Off"}</span><button class="btn ${on ? "" : "primary"}" id="bioToggle">${on ? "Turn off" : "Turn on"}</button></div>
-      <p class="fine">${on ? `Egom asks for ${esc(name)} when you open it, and when you come back after a minute away.` : `Ask for ${esc(name)} each time Egom opens, so nobody else can see your records on this ${isIOS() || /android/i.test(navigator.userAgent) ? "phone" : "device"}.`}</p>`;
-    $("bioToggle").onclick = async () => {
-      if (on) { turnOffLock(); close(); return toast(name + " lock is off"); }
-      if (demo) return toast("In the preview, the lock can't be turned on. It works on egom.ng.");
-      const err = await turnOnLock();
-      if (err) return toast(err);
-      close(); toast(name + " lock is on");
-    };
-  });
   $("pwForm").onsubmit = async (e) => {
     e.preventDefault();
     const a = $("pwNew").value, b = $("pwNew2").value;
