@@ -878,27 +878,28 @@ html,body{background:var(--bg)}
 .tryit .btn .ico{width:18px;height:18px;margin-right:6px;vertical-align:-4px}
 .wa-nudge.first{border-color:color-mix(in srgb,var(--accent) 60%,transparent);background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
 .wa-nudge.first a.btn{text-decoration:none;white-space:nowrap}
-/* Business expenses list: one search pill, then filter chips that match the Invoices page */
+/* Business expenses list: search with a Filter button beside it, then chips like the Invoices page */
 .lf{display:flex;flex-direction:column;gap:12px;margin:4px 0 8px}
-.lf-q{display:flex;align-items:center;gap:10px;height:46px;padding:0 16px;border-radius:999px;background:var(--glass,var(--surface));box-shadow:var(--glass-edge,var(--shadow));color:var(--muted)}
+.lf-top{display:flex;gap:10px;align-items:center}
+.lf-q{flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:46px;padding:0 16px;border-radius:999px;background:var(--glass,var(--surface));box-shadow:var(--glass-edge,var(--shadow));color:var(--muted)}
 .lf-q svg{width:18px;height:18px;flex:0 0 18px}
 .lf-q input{border:0;background:none;padding:0;margin:0;flex:1;min-width:0;height:100%;font:inherit;font-size:15px;color:var(--ink);outline:none;box-shadow:none}
 .lf-q:focus-within{box-shadow:0 0 0 2px var(--leaf)}
+.lf-fbtn{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;height:46px;padding:0 18px;border-radius:999px;border:0;background:var(--glass,var(--surface));box-shadow:var(--glass-edge,var(--shadow));color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.lf-fbtn svg{width:18px;height:18px}
+.lf-fbtn b{display:grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--accent,var(--leaf));color:var(--on-lime,#0E0E0E);font-size:12px}
+.lf-fbtn:focus-visible{outline:2px solid var(--leaf);outline-offset:2px}
 .lf-chips{display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 1px}
 .lf-chips::-webkit-scrollbar{display:none}
-.lf-kind{display:inline-flex;gap:8px;flex:0 0 auto}
-.lf-kind button,.lf-chip{flex:0 0 auto;height:34px;padding:0 14px;border-radius:999px;border:0;background:var(--glass,var(--surface));box-shadow:var(--glass-edge,var(--shadow));color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
-.lf-kind button.on{background:var(--accent,var(--leaf));color:var(--on-lime,#0E0932);box-shadow:none}
-.lf-div{flex:0 0 1px;height:20px;background:var(--line);margin:0 4px}
-.lf-chip{position:relative;display:inline-flex;align-items:center;gap:6px;padding:0 12px 0 14px}
-.lf-chip .lf-chip-t{max-width:180px;overflow:hidden;text-overflow:ellipsis}
-.lf-dn svg{width:14px;height:14px;display:block;color:var(--muted)}
-.lf-chip select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0;padding:0;border:0;font-size:16px}
-.lf-chip:focus-within{box-shadow:0 0 0 2px var(--leaf)}
-.lf-chip.on{background:var(--ink);color:var(--surface);box-shadow:none;padding-right:6px}
-.lf-chip.on .lf-dn svg{color:currentColor;opacity:.7}
-.lf-x{position:relative;z-index:1;display:grid;place-items:center;width:24px;height:24px;margin-left:2px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:inherit;cursor:pointer;padding:0}
-.lf-x svg{width:13px;height:13px}
+.lf-c{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:999px;border:0;background:var(--glass,var(--surface));box-shadow:var(--glass-edge,var(--shadow));color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.lf-c.on{background:var(--accent,var(--leaf));color:var(--on-lime,#0E0E0E);box-shadow:none}
+.lf-picked span{max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.lf-picked svg{width:13px;height:13px;color:var(--muted)}
+.lf-div{flex:0 0 1px;height:20px;background:var(--line);margin:0 2px}
+.lff-foot{display:flex;gap:10px;margin-top:20px}
+.lff-foot .btn{flex:1}
+.lff-foot .btn.primary{flex:2}
+@media (max-width:520px){.lf-fbtn span{display:none}.lf-fbtn{width:46px;padding:0;justify-content:center;position:relative}.lf-fbtn b{position:absolute;top:-4px;right:-4px}}
 .lf-sum{display:flex;align-items:baseline;gap:10px;margin:6px 4px 10px;font-size:13px;color:var(--muted)}
 .lf-tot{margin-left:auto;display:flex;align-items:baseline;gap:6px}
 .lf-tot small{font-size:12px;color:var(--muted)}
@@ -1557,6 +1558,7 @@ const IC = {
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
   pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>',
+  filter: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
   home: '<path d="M4 11 12 4l8 7v9H4z"/><path d="M10 20v-5h4v5"/>',
   card: '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h3"/>',
   calendar: '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>',
@@ -2110,27 +2112,61 @@ function listRows() {
     && (!q || [r.counterparty, r.narration, r.note, r.category, r.reference, r.bank, String(r.amount)].filter(Boolean).join(" ").toLowerCase().includes(q)))
     .sort((a, b) => (b.tx_date + (b.tx_time || "")).localeCompare(a.tx_date + (a.tx_time || "")));
 }
+function listPool() { return (LF.scope === "all" ? rows.filter(inLedger) : monthRows(ym)).filter((r) => r.kind !== "transfer" && (LF.kind === "all" || (LF.kind === "out" ? r.kind !== "income" : r.kind === "income"))); }
+function listOptions() {
+  const pool = listPool(), uniq = (f) => [...new Set(pool.map(f).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  return { who: uniq(whoOf), cat: uniq((r) => r.category), acct: uniq((r) => r.bank) };
+}
+const LF_LABEL = { who: "Vendor", cat: "Category", acct: "Account" };
+const lfShow = (k, v) => k === "who" ? niceName(v) : v;
 function listView() {
-  const pool = (LF.scope === "all" ? rows.filter(inLedger) : monthRows(ym)).filter((r) => r.kind !== "transfer" && (LF.kind === "all" || (LF.kind === "out" ? r.kind !== "income" : r.kind === "income")));
-  const uniq = (f) => [...new Set(pool.map(f).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-  const whos = uniq(whoOf), cats = uniq((r) => r.category), accts = uniq((r) => r.bank);
-  [["who", whos], ["cat", cats], ["acct", accts]].forEach(([k, l]) => { if (LF[k] && !l.includes(LF[k])) LF[k] = ""; });
-  // Each filter is a pill like the Invoices chips; a hidden native picker sits on top so phones get their own list
-  const chip = (id, k, label, list, show) => { const v = LF[k], on = !!v;
-    return `<span class="lf-chip${on ? " on" : ""}"><span class="lf-chip-t">${on ? esc(show(v)) : label}</span><i class="lf-dn">${icon("chevDown")}</i><select id="${id}" aria-label="${label}"><option value="">${on ? "All " + label.toLowerCase() + "s" : label + ": all"}</option>${list.map((x) => `<option value="${esc(x)}"${x === v ? " selected" : ""}>${esc(show(x))}</option>`).join("")}</select>${on ? `<button type="button" class="lf-x" data-clear="${k}" aria-label="Clear ${label.toLowerCase()}">${icon("close")}</button>` : ""}</span>`; };
-  const when = `<span class="lf-chip${LF.scope === "all" ? " on" : ""}"><span class="lf-chip-t">${LF.scope === "all" ? "All time" : esc(monthTitle(ym))}</span><i class="lf-dn">${icon("chevDown")}</i><select id="lfScope" aria-label="When"><option value="month"${LF.scope === "month" ? " selected" : ""}>${esc(monthTitle(ym))}</option><option value="all"${LF.scope === "all" ? " selected" : ""}>All time</option></select></span>`;
+  const o = listOptions();
+  ["who", "cat", "acct"].forEach((k) => { if (LF[k] && !o[k].includes(LF[k])) LF[k] = ""; });
+  const active = ["who", "cat", "acct"].filter((k) => LF[k]);
+  const n = active.length + (LF.scope === "all" ? 1 : 0);
+  // Search with one Filter button beside it; the picks live in a sheet. What's picked shows as chips you can remove.
   return `<div class="lf">
-      <div class="lf-q">${icon("search")}<input id="lfQ" type="search" value="${esc(LF.q)}" placeholder="Search who, note, amount or reference" aria-label="Search records" autocomplete="off"></div>
-      <div class="lf-chips">
-        <div class="lf-kind" role="group" aria-label="Show">${[["out", "Spent"], ["in", "Received"], ["all", "All"]].map(([k, l]) => `<button type="button" data-lk="${k}" aria-pressed="${LF.kind === k}" class="${LF.kind === k ? "on" : ""}">${l}</button>`).join("")}</div>
-        <span class="lf-div" aria-hidden="true"></span>
-        ${chip("lfWho", "who", "Vendor", whos, niceName)}${chip("lfCat", "cat", "Category", cats, (x) => x)}${chip("lfAcct", "acct", "Account", accts, (x) => x)}${when}
+      <div class="lf-top">
+        <div class="lf-q">${icon("search")}<input id="lfQ" type="search" value="${esc(LF.q)}" placeholder="Search name, note or amount" aria-label="Search records" autocomplete="off"></div>
+        <button type="button" class="lf-fbtn${n ? " on" : ""}" id="lfFilter" aria-haspopup="dialog">${icon("filter")}<span>Filter</span>${n ? `<b>${n}</b>` : ""}</button>
+      </div>
+      <div class="lf-chips" role="group" aria-label="Show">
+        ${[["out", "Spent"], ["in", "Received"], ["all", "All"]].map(([k, l]) => `<button type="button" data-lk="${k}" aria-pressed="${LF.kind === k}" class="lf-c${LF.kind === k ? " on" : ""}">${l}</button>`).join("")}
+        ${n ? `<span class="lf-div" aria-hidden="true"></span>` : ""}
+        ${active.map((k) => `<button type="button" class="lf-c lf-picked" data-clear="${k}" aria-label="Remove ${LF_LABEL[k].toLowerCase()} filter: ${esc(lfShow(k, LF[k]))}"><span>${esc(lfShow(k, LF[k]))}</span>${icon("close")}</button>`).join("")}
+        ${LF.scope === "all" ? `<button type="button" class="lf-c lf-picked" data-clear="scope" aria-label="Back to ${esc(monthTitle(ym))}"><span>All time</span>${icon("close")}</button>` : ""}
       </div>
     </div><div id="lfOut">${listOut()}</div>`;
 }
+function openListFilter() {
+  const draft = { who: LF.who, cat: LF.cat, acct: LF.acct, scope: LF.scope };
+  const count = () => { const keep = { ...LF }; Object.assign(LF, draft); const c = listRows().length; Object.assign(LF, keep); return c; };
+  const paint = () => {
+    const keep = LF.scope; LF.scope = draft.scope; const o = listOptions(); LF.scope = keep;
+    ["who", "cat", "acct"].forEach((k) => { if (draft[k] && !o[k].includes(draft[k])) draft[k] = ""; });
+    const sel = (k) => `<label for="lff_${k}">${LF_LABEL[k]}</label><select id="lff_${k}" data-k="${k}"><option value="">All ${LF_LABEL[k] === "Category" ? "categories" : LF_LABEL[k].toLowerCase() + "s"}</option>${o[k].map((x) => `<option value="${esc(x)}"${x === draft[k] ? " selected" : ""}>${esc(lfShow(k, x))}</option>`).join("")}</select>`;
+    const c = count();
+    $("lffBody").innerHTML = `<label>When</label><div class="toggle wide" role="group" aria-label="When">${[["month", monthTitle(ym)], ["all", "All time"]].map(([k, l]) => `<button type="button" data-sc="${k}" class="${draft.scope === k ? "on" : ""}">${esc(l)}</button>`).join("")}</div>
+      ${sel("who")}${sel("cat")}${sel("acct")}`;
+    $("lffGo").textContent = c ? `Show ${c} record${c === 1 ? "" : "s"}` : "Nothing matches";
+    $("lffGo").disabled = !c;
+    $("lffBody").querySelectorAll("select").forEach((el) => el.onchange = () => { draft[el.dataset.k] = el.value; paint(); });
+    $("lffBody").querySelectorAll("[data-sc]").forEach((b) => b.onclick = () => { draft.scope = b.dataset.sc; paint(); });
+  };
+  $("sheetRoot").innerHTML = `<div class="bg" id="lffBg"><div class="sheet" role="dialog" aria-label="Filter records">
+    <div style="display:flex;justify-content:space-between;align-items:center"><h4>Filter</h4><button class="btn" id="lffX" aria-label="Close">${icon("close")}</button></div>
+    <div id="lffBody"></div>
+    <div class="lff-foot"><button type="button" class="btn" id="lffReset">Clear all</button><button type="button" class="btn primary" id="lffGo"></button></div>
+  </div></div>`;
+  const close = () => ($("sheetRoot").innerHTML = "");
+  $("lffX").onclick = close; $("lffBg").onclick = (e) => { if (e.target.id === "lffBg") close(); };
+  $("lffReset").onclick = () => { Object.assign(draft, { who: "", cat: "", acct: "", scope: "month" }); paint(); };
+  $("lffGo").onclick = () => { Object.assign(LF, draft); close(); renderTx(); };
+  paint();
+}
 function listOut() {
   const list = listRows(), total = list.reduce((t, r) => t + (r.kind === "income" ? Number(r.amount) : spend(r)), 0);
-  const any = LF.q || LF.who || LF.cat || LF.acct;
+  const any = LF.q || LF.who || LF.cat || LF.acct || LF.scope === "all";
   const word = LF.kind === "out" ? "spent" : LF.kind === "in" ? "received" : "net";
   const sumLine = `<div class="lf-sum"><span>${list.length} record${list.length === 1 ? "" : "s"}${any ? ` · <button class="lf-clear" id="lfClear" type="button">Clear filters</button>` : ""}</span><span class="lf-tot"><small>${word}</small><b>${money(total)}</b></span></div>`;
   if (!list.length) return sumLine + `<div class="empty">${rows.filter(inLedger).length ? "Nothing matches. Try another filter or All time." : "No records yet. Forward a receipt to Egom on WhatsApp, or tap + to add one."}</div>`;
@@ -2149,11 +2185,11 @@ function wireList() {
   const out = () => { $("lfOut").innerHTML = listOut(); wireOut(); };
   const wireOut = () => {
     $("view").querySelectorAll("#lfOut [data-id]").forEach((el) => { el.onclick = () => openTx(el.dataset.id); el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openTx(el.dataset.id); } }; });
-    if ($("lfClear")) $("lfClear").onclick = () => { Object.assign(LF, { q: "", who: "", cat: "", acct: "" }); renderTx(); };
+    if ($("lfClear")) $("lfClear").onclick = () => { Object.assign(LF, { q: "", who: "", cat: "", acct: "", scope: "month" }); renderTx(); };
   };
   $("lfQ").oninput = () => { LF.q = $("lfQ").value; out(); };
-  [["lfWho", "who"], ["lfCat", "cat"], ["lfAcct", "acct"], ["lfScope", "scope"]].forEach(([id, k]) => $(id).onchange = () => { LF[k] = $(id).value; renderTx(); });
-  $("view").querySelectorAll("[data-clear]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); LF[b.dataset.clear] = ""; renderTx(); });
+  $("lfFilter").onclick = openListFilter;
+  $("view").querySelectorAll(".lf-chips [data-clear]").forEach((b) => b.onclick = () => { const k = b.dataset.clear; LF[k] = k === "scope" ? "month" : ""; renderTx(); });
   $("view").querySelectorAll("[data-lk]").forEach((b) => b.onclick = () => { LF.kind = b.dataset.lk; renderTx(); });
   wireOut();
 }
