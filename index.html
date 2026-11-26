@@ -1083,11 +1083,13 @@ const BANKS = ["OPay", "Moniepoint", "Kuda", "PalmPay", "GTBank", "Guaranty Trus
 
                         
                                                                                           
-                                                                                                          
+                                                                                                                       
+                   
                                                                                                        
                                                                                                     
+                                                                                        
+                                                                                     
   
-
 const norm = (s         ) => String(s ?? "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
 
 // ---------------------------------------------------------------- OCR
@@ -1229,10 +1231,11 @@ function spaceFromOwner(owner        , personalName        , businessName       
   return null;
 }
 
-                                                                   
+                                                                                                                 
 function finish(base                                                                                           , opts            = {})           {
   const preset = opts.preset ?? "general";
   const basis = `${base.narration} ${base.counterparty}`;
+  if (base.direction === "transfer") return { ...base, category_personal: "", category_business: "", likely_space: null, confidence: 0.8 };
   if (base.direction === "credit") {
     // Money from your own business into your pocket (e.g. salary from your company) is personal income
     const fromOwnBiz = !!opts.businessName && spaceFromOwner(base.counterparty, "", opts.businessName) === "business";
@@ -1241,6 +1244,74 @@ function finish(base                                                            
   const p = categorize("personal", basis), b = categorize("business", basis, preset);
   return { ...base, category_personal: p.category, category_business: b.category, likely_space: guessSpace(basis, preset, opts.businessName), confidence: Math.max(p.score, b.score) > 0 ? 0.7 : 0 };
 }
+// Recompute categories after the direction is corrected
+function recategorise(t          , direction                    , counterparty        , opts            = {})           {
+  return finish({ ...t, direction, counterparty }, opts);
+}
+
+// ---------------------------------------------------------------- who sent, who received
+// Receipts put the two people in blocks: "Sender / From / Sender details" and
+// "Recipient / Beneficiary / To / Receiver". Each block has a name and usually a bank.
+const BANK_ALIASES                     = [
+  [/\bmonie\s*point\b|\bmoniepoint\b|\bteamapt\b/i, "Moniepoint"], [/\bo\s?pay\b|\bpaycom\b/i, "OPay"], [/\bpalm\s?pay\b/i, "PalmPay"],
+  [/\bkuda\b/i, "Kuda"], [/\bgt\s?bank\b|\bguaranty\s+trust\b|\bgtco\b/i, "GTBank"], [/\baccess\b/i, "Access"], [/\bzenith\b/i, "Zenith"],
+  [/\buba\b|\bunited bank for africa\b/i, "UBA"], [/\bfirst\s?bank\b|\bfirst bank of nigeria\b|\bfbn\b/i, "First Bank"], [/\bfidelity\b/i, "Fidelity"],
+  [/\bfcmb\b|\bfirst city monument\b/i, "FCMB"], [/\bsterling\b/i, "Sterling"], [/\bwema\b|\balat\b/i, "Wema"], [/\bunion bank\b/i, "Union Bank"],
+  [/\bstanbic\b/i, "Stanbic"], [/\becobank\b/i, "Ecobank"], [/\bpolaris\b/i, "Polaris"], [/\bprovidus\b/i, "Providus"], [/\bkeystone\b/i, "Keystone"],
+  [/\bjaiz\b/i, "Jaiz"], [/\bcarbon\b/i, "Carbon"], [/\bpaystack\b/i, "Paystack"], [/\bflutterwave\b/i, "Flutterwave"], [/\bpaga\b/i, "Paga"],
+  [/\bfair\s?money\b/i, "FairMoney"], [/\bvfd\b|\bv bank\b|\bvbank\b/i, "VFD"], [/\bglobus\b/i, "Globus"], [/\btitan\b/i, "Titan"],
+  [/\blotus\b/i, "Lotus"], [/\btaj\s?bank\b/i, "TAJBank"], [/\bparallex\b/i, "Parallex"], [/\bunity bank\b/i, "Unity Bank"], [/\bheritage\b/i, "Heritage"],
+  [/\bstandard chartered\b/i, "Standard Chartered"], [/\bciti\s?bank\b/i, "Citibank"], [/\bmoremonee\b/i, "Moremonee"], [/\brubies\b/i, "Rubies"],
+  [/\bsmartcash\b/i, "SmartCash"], [/\bmomo\b|\bmtn momo\b/i, "MoMo"], [/\bpocketapp\b|\bpocket by piggyvest\b/i, "Pocket"], [/\bkredi\b/i, "Kredi"],
+];
+function bankIn(s        )         {
+  for (const [re, name] of BANK_ALIASES) if (re.test(s)) return name;
+  return "";
+}
+const SENDER_LABEL = /^(?:received\s+from|sender(?:'s)?(?:\s+(?:name|details|account(?:\s+name)?|info))?|from(?:\s+account)?|source(?:\s+account)?|debit(?:ed)?\s+account|originator(?:\s+name)?|paid\s+by|payer(?:\s+name)?|account\s+debited|transferred\s+by|sent\s+by)\b\s*[:\-|]?/i;
+const RECIP_LABEL = /^(?:recipient(?:'s)?(?:\s+(?:name|details|account(?:\s+name)?|info))?|beneficiary(?:\s+(?:name|details|account(?:\s+name)?|info))?|receiver(?:\s+(?:name|details))?|to(?:\s+account)?|destination(?:\s+account)?|credit(?:ed)?\s+(?:account|to)|paid\s+to|sent\s+to|transfer(?:red)?\s+to|payee(?:\s+name)?|account\s+credited)\b\s*[:\-|]?/i;
+const SENDER_BANK = /^(?:sender(?:'s)?\s+bank|from\s+bank|source\s+bank|originator\s+bank|debit\s+bank)\b\s*[:\-|]?/i;
+const RECIP_BANK = /^(?:recipient(?:'s)?\s+bank|beneficiary(?:'s)?\s+bank|receiver(?:'s)?\s+bank|to\s+bank|destination\s+bank|credit\s+bank|bank\s+name)\b\s*[:\-|]?/i;
+const STOP_LABEL = /^(amount|transaction|date|time|status|reference|ref|session|narration|remarks?|description|purpose|fee|charges?|type|channel|receipt|payment|note|memo|currency|total|vat|stamp|balance|support|download|share|report|this receipt|disclaimer|thank)/i;
+
+                                            
+// A person's name from a line like "EMEKA JOHN | Moniepoint | 801***1234" or "Emeka John 0123456789 OPay"
+function nameFrom(s        )         {
+  let t = String(s || "");
+  for (const [re] of BANK_ALIASES) t = t.replace(re, " ");
+  t = t.replace(/\b(micro[-\s]?finance|mfb|bank|plc|limited liability)\b\.?/gi, " ")
+    .replace(/[*xX]{2,}\d*/g, " ").replace(/\d[\d*\s-]{4,}\d/g, " ").replace(/\b\d+\b/g, " ")
+    .replace(/[|•·,:;()\[\]]/g, " ").replace(/\b(name|account|acct|details?|no\.?|number)\b/gi, " ")
+    .replace(/\s+/g, " ").trim();
+  // OCR can tack a stray letter or two onto the end
+  return t.replace(/\s+[a-z]$/i, "").slice(0, 80);
+}
+function block(lines          , label        , bankLabel        )        {
+  let name = "", bank = "";
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (bankLabel.test(l)) { const b = bankIn(l.replace(bankLabel, "")) || bankIn(lines[i + 1] ?? ""); if (b) bank = b; continue; }
+    const m = l.match(label);
+    if (!m || name) continue;
+    const rest = l.slice(m[0].length).trim();
+    const window = [rest, ...lines.slice(i + 1, i + 4).filter((x, k, arr) => !arr.slice(0, k + 1).some((y) => STOP_LABEL.test(y) || SENDER_LABEL.test(y) || RECIP_LABEL.test(y)))];
+    for (const w of window) {
+      if (!name) { const n = nameFrom(w); if (n.length >= 3 && /[a-z]{2}/i.test(n)) name = n; }
+      if (!bank) bank = bankIn(w);
+    }
+  }
+  return { name, bank };
+}
+// The app that made the receipt: its name sits in the first lines or in the footer
+function issuer(lines          )         {
+  const head = lines.slice(0, 4).join(" "), foot = lines.slice(-4).join(" ");
+  return bankIn(head) || (/\b(powered by|thank you for (?:banking|choosing|using))\b/i.test(foot) ? bankIn(foot) : "");
+}
+const nameMatches = (party        , names          ) => !!party && names.some((n) => {
+  const w = norm(n).split(" ").filter((x) => x.length > 1 && !NAME_FILLER.has(x));
+  const o = norm(party);
+  return w.length > 0 && w.every((x) => new RegExp(`(^|\\s)${x}`).test(o));
+});
 
 // ---------------------------------------------------------------- main parsers
 function parseReceiptText(text        , today        , opts            = {})                  {
@@ -1253,62 +1324,123 @@ function parseReceiptText(text        , today        , opts            = {})    
   const date = findDate(dateLine, +today.slice(0, 4)) ?? findDate(flat, +today.slice(0, 4));
   const time = findTime(dateLine) ?? findTime(flat);
 
-  const SENDER = /\b(sender|from account|debit account|originator|paid by)\b/i;
-  let counterparty = cleanName(valueAfter(lines,
-    /\b(beneficiary(?: name| details| account name)?|recipient(?: name| details| account)?|receiver(?: name)?|credited to|paid to|sent to|transfer to|account name|merchant(?: name)?|biller|to)\b/i, SENDER));
-  const credit = /\b(money received|you received|received from|credit alert|incoming transfer|inward transfer|deposit)\b/i.test(flat) && !/\b(beneficiary|recipient)\b/i.test(flat);
-  if (credit) counterparty = cleanName(valueAfter(lines, /\b(sender(?: name| details)?|from|received from|originator)\b/i)) || counterparty;
+  const sender = block(lines, SENDER_LABEL, SENDER_BANK);
+  const recip = block(lines, RECIP_LABEL, RECIP_BANK);
+  const madeBy = issuer(lines);
 
-  const ownerName = credit
-    ? cleanName(valueAfter(lines, /\b(beneficiary(?: name| details)?|recipient(?: name| details)?|credited to|to account|account name|to)\b/i))
-    : cleanName(valueAfter(lines, /\b(sender(?: name| details| account name)?|from account|debit account|account name|originator|paid by|from)\b/i, /\b(beneficiary|recipient|received from)\b/i));
+  // Which way did the money go? Names first: if the receiver is you, it's money in.
+  const mine = [opts.personalName ?? "", opts.businessName ?? "", ...(opts.extraNames ?? [])].filter((n) => n.trim());
+  const senderMe = nameMatches(sender.name, mine), recipMe = nameMatches(recip.name, mine);
+  const creditWords = /\b(money received|you received|you have received|received from|credit alert|credited|incoming|inward|deposit|cr\b|credit transaction|payment received|transfer received|you got)\b/i.test(flat);
+  const debitWords = /\b(debit alert|debited|you sent|you paid|transfer successful|transfer to|sent to|paid to|outward|withdrawal|purchase|airtime|data bundle|bill payment|pos purchase|dr\b|debit transaction)\b/i.test(flat);
+  let direction                                 , sure = true;
+  if (senderMe && recipMe) direction = "transfer";
+  else if (recipMe) direction = "credit";
+  else if (senderMe) direction = "debit";
+  else if (creditWords && !debitWords) direction = "credit";
+  else if (debitWords && !creditWords) direction = "debit";
+  else { direction = "debit"; sure = !(sender.name && recip.name); }
 
-  const narration = valueAfter(lines, /\b(narration|remarks?|description|purpose|payment for|memo|note)\b/i)
-    .replace(/^[:\-\s]+/, "").slice(0, 200);
+  // The other party, and which of YOUR accounts the money moved through
+  let counterparty        , other        , bank        , to_bank = "", owner        ;
+  if (direction === "credit") {
+    counterparty = sender.name; other = recip.name; owner = recip.name;
+    bank = recip.bank || (creditWords ? madeBy : "") || "";
+  } else if (direction === "transfer") {
+    counterparty = recip.bank || recip.name; other = sender.name; owner = sender.name;
+    bank = sender.bank || madeBy || ""; to_bank = recip.bank || "";
+  } else {
+    counterparty = recip.name; other = sender.name; owner = sender.name;
+    // The receipt's own app is the sender's bank on a transfer receipt; never the receiver's bank
+    bank = sender.bank || (madeBy && madeBy !== recip.bank ? madeBy : "") || (!recip.bank ? madeBy : "");
+    // A card slip names the card's bank somewhere on it
+    if (!bank && !sender.name && !recip.name) bank = bankIn(flat);
+  }
+  // Shop receipts and POS slips have no blocks: fall back to the merchant line
+  if (!counterparty) counterparty = cleanName(valueAfter(lines, /\b(merchant(?: name)?|biller|account name|paid to|to)\b/i, SENDER_LABEL));
+
+  const narration = valueAfter(lines, /^(?:narration|remarks?|description|purpose|payment for|memo|note|transfer note|comment)\b/i)
+    .replace(/^[:\-\s]+/, "").replace(/\s{2,}/g, " ").slice(0, 200);
 
   const refRaw = valueAfter(lines, /\b(session id|transaction (?:reference|ref|id|no\.?|number)|reference(?: no\.?| number| id)?|ref(?:\.|erence)?\s*(?:no\.?|#)?|receipt (?:no\.?|number))\b/i);
   const reference = (refRaw.replace(/\s/g, "").match(/[A-Za-z0-9\-/]{6,}/)?.[0] ?? "").slice(0, 60);
 
-  const bank = BANKS.find((b) => new RegExp(`\\b${b}\\b`, "i").test(flat)) ?? "";
-
-  return finish({
-    date: date ?? today, time, amount, fee: findFee(lines), currency: "NGN",
-    direction: credit ? "credit" : "debit", counterparty, narration, reference, bank, owner_name: ownerName,
-  }, opts);
+  return { ...finish({
+    date: date ?? today, time, amount, fee: direction === "credit" ? 0 : findFee(lines), currency: "NGN",
+    direction, counterparty, narration, reference, bank, to_bank, owner_name: owner,
+  }, opts), sure, other_party: other };
 }
 
-// Typed entries.
-// Spending:  "5000 diesel for gen business", "2.5k lunch", "₦12,000 cables for Lekki job"
-// Money in:  "+50000 from Mr Adebayo solar balance", "received 150k from Ada Foods salary", "income 20k gift from mum"
-function parseManual(text        , today        , opts            = {})                  {
-  const lead = text.match(/^\s*(\+|received|recieved|got|income|credit|money in)\s*:?\s*/i);
-  const body = lead ? text.slice(lead[0].length) : text;
-  const m = body.match(/^\s*(?:₦|n|ngn)?\s*([\d,]+(?:\.\d+)?)\s*(k|m)?\b/i);
-  if (!m) return null;
-  let amount = toNum(m[1]);
-  if (/k/i.test(m[2] ?? "")) amount *= 1000;
-  if (/m/i.test(m[2] ?? "")) amount *= 1_000_000;
-  if (!(amount > 0)) return null;
-  const rest = body.slice(m[0].length);
-  const income = !!lead || /\b(paid me|sent me|received from|income from|credited)\b/i.test(rest);
-  const ledgerWords = new RegExp(`\\b(personal|biz|business${opts.businessName ? "|" + norm(opts.businessName).split(" ").filter((w) => w.length > 2).join("|") : ""})\\b`, "gi");
-  let payee = "", narration = rest;
-  if (income) {
-    // "from Mr Adebayo for solar balance" -> payer "Mr Adebayo", note "solar balance"
-    const f = rest.match(/\bfrom\s+(.+?)(?=\s+(?:for|re|being|as)\b|\s*[-–,]\s|$)/i);
-    if (f) {
-      payee = f[1].replace(/\s+/g, " ").trim();
-      narration = rest.replace(f[0], " ").replace(/^\s*(for|re|being|as)\b/i, "");
-      // "Mr Adebayo solar balance": the name is the capitalised part, the rest is what it was for
-      const words = payee.split(" ");
-      const cut = /^[A-Z]/.test(words[0] ?? "") ? words.findIndex((w, i) => i > 0 && /^[a-z]/.test(w)) : -1;
-      if (cut > 0) { narration = words.slice(cut).join(" ") + " " + narration; payee = words.slice(0, cut).join(" "); }
-    }
-  } else {
-    payee = rest.match(/\b(?:to|for)\s+([A-Z][\w.&'-]*(?:\s+[A-Z][\w.&'-]*)*)/)?.[1] ?? "";
+// ---------------------------------------------------------------- typed messages, in plain words
+// Money out:  "5000 fuel", "I paid Emeka 20k for transport", "bought cables 45,000", "sent mum 10k"
+// Money in:   "+50000 from Mr Ade", "Mr Ade paid me 450k for the Lekki job", "received 150k salary",
+//             "sold 2 panels to Tunde for 380k", "customer paid 200k balance", "got 20k from mum"
+const IN_CUES = /\b(received|recieved|recived|got|collected|earned|made|sold|income|credit(?:ed)?|deposit(?:ed)?|money in|paid me|sent me|transferred to me|gave me|refunded|refund from|reversal|customer paid|client paid)\b/i;
+const OUT_CUES = /\b(paid|pay|spent|spend|bought|buy|purchased|sent|send|gave|give|transferred|transfer|withdrew|withdrawal|debited|cost|bill)\b/i;
+const WORDNUM                         = { thousand: 1e3, k: 1e3, grand: 1e3, million: 1e6, m: 1e6, mil: 1e6, billion: 1e9, b: 1e9 };
+function findTypedAmount(text        )                                                     {
+  const re = /(?:₦|ngn|\bn(?=\d)|#)?\s?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(k|m|b|mil|thousand|million|billion|grand)?(?![\w])(?:\s*naira)?/gi;
+  let best                                                     = null;
+  for (const m of text.matchAll(re)) {
+    let v = toNum(m[1]);
+    const unit = (m[2] ?? "").toLowerCase();
+    if (unit) v *= WORDNUM[unit] ?? 1;
+    // A small number right before a word like "panels" or "bags" is a count, not money
+    const after = text.slice((m.index ?? 0) + m[0].length);
+    if (!unit && v < 100 && !/naira|[₦#]|ngn/i.test(m[0]) && /^\s+[a-z]/i.test(after) && !/^\s+(naira|k\b|thousand)/i.test(after)) continue;
+    if (!(v > 0)) continue;
+    // A bare small number ("job 2", "phase 3") isn't money unless it's marked as money
+    if (!unit && v < 50 && !/[₦#]|ngn|naira/i.test(m[0] + after.slice(0, 7))) continue;
+    if (!best || v > best.amount) best = { amount: v, at: m.index ?? 0, len: m[0].length };
   }
-  narration = narration.replace(ledgerWords, "").replace(/\b(paid me|sent me|received from|income from|credited)\b/gi, "").replace(/^[\s:,–-]+/, "").replace(/\s+/g, " ").trim().slice(0, 200);
-  return finish({ date: today, time: null, amount, fee: 0, currency: "NGN", direction: income ? "credit" : "debit", counterparty: payee.slice(0, 80), narration, reference: "", bank: "", owner_name: "" }, opts);
+  return best;
+}
+const RELATIVE_DAY                     = [[/\byesterday\b/i, -1], [/\btoday\b/i, 0], [/\b(?:2|two) days ago\b/i, -2]];
+function shiftDay(today        , d        ) { const t = new Date(today + "T12:00:00Z"); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); }
+const NAME_RE = "((?:(?:mr|mrs|ms|miss|dr|engr|chief|alhaji|madam|aunty|uncle|pastor|bro|sis|prof|barr?)\\.?\\s+)?[A-Za-z][\\w.&'-]*(?:\\s+(?!for\\b|to\\b|from\\b|on\\b|at\\b|as\\b|being\\b|via\\b|with\\b|today\\b|yesterday\\b|naira\\b)[A-Za-z][\\w.&'-]*){0,3})";
+function parseManual(text        , today        , opts            = {})                  {
+  const raw = text.replace(/\s+/g, " ").trim();
+  const plus = /^\s*\+/.test(raw);
+  const body = raw.replace(/^\s*[+-]\s*/, "");
+  const amt = findTypedAmount(body);
+  if (!amt) return null;
+  // Must read like money: the number leads, or there's a money word nearby
+  const leads = amt.at <= 2;
+  if (!leads && !IN_CUES.test(body) && !OUT_CUES.test(body) && !/₦|naira|\bngn\b|\d\s*k\b/i.test(body)) return null;
+  const amount = amt.amount;
+  const before = body.slice(0, amt.at).trim(), after = body.slice(amt.at + amt.len).trim();
+  // "Chief Okafor sent 1.2m" / "Tunde transferred 50k": someone else did the paying, so it's money in
+  const theyPaid = new RegExp(`^${NAME_RE}\\s+(?:has\\s+|just\\s+)?(?:paid|sent|transferred|gave)\\b`, "i").exec(body);
+  const someoneElse = !!theyPaid && !/^(i|we|i've|i have|we have|just)\b/i.test(body);
+  const income = plus || someoneElse || IN_CUES.test(body) && !/\b(i paid|i sent|i gave|i bought|i spent|paid to|sent to)\b/i.test(body);
+  const date = RELATIVE_DAY.find(([re]) => re.test(body));
+  let who = "", m                         ;
+  const S = (re        ) => new RegExp(re, "i");
+  if (income) {
+    if ((m = body.match(S(`\\bfrom\\s+${NAME_RE}`)))) who = m[1];
+    else if ((m = body.match(S(`^${NAME_RE}\\s+(?:paid|sent|gave|transferred)(?:\\s+me)?\\b`)))) who = m[1];
+    else if ((m = body.match(S(`\\bsold\\b.*?\\bto\\s+${NAME_RE}`)))) who = m[1];
+    else if ((m = body.match(S(`\\b(?:customer|client)\\s+${NAME_RE}\\s+paid\\b`)))) who = m[1];
+  } else {
+    if ((m = body.match(S(`\\b(?:paid|sent|gave|transferred|transfer)\\s+(?:to\\s+)?${NAME_RE}\\s+(?=\\S*\\d)`)))) who = m[1];
+    else if ((m = body.match(S(`\\b(?:to|paid)\\s+${NAME_RE}`)))) who = m[1];
+    else if ((m = body.match(/\b(?:at|from)\s+([A-Z][\w.&'-]*(?:\s+[A-Z][\w.&'-]*)*)/))) who = m[1];
+  }
+  who = who.replace(/^(i|we|my|the|a)\s+/i, "").replace(/\s+(me|for|to)$/i, "").trim();
+  if (/^(i|me|we|it|them|him|her|you|customer|client|someone|somebody)$/i.test(who) || /\d/.test(who)) who = "";
+  // What it was for: everything that isn't the amount, the person or the filler words
+  const ledgerWords = new RegExp(`\\b(personal|biz|business${opts.businessName ? "|" + norm(opts.businessName).split(" ").filter((w) => w.length > 2).join("|") : ""})\\b`, "gi");
+  let narration = `${before} ${after}`.replace(who ? new RegExp(who.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : /$^/, " ")
+    .replace(/^\s*(i|we)\b/i, " ").replace(IN_CUES, " ").replace(/\b(i|we|just|have|has|had|was|were|me|my|naira|ngn|today|yesterday|two days ago|2 days ago|from|to|the|for|on|of|a|an)\b/gi, " ")
+    .replace(/\b(paid|pay|spent|spend|bought|buy|purchased|sent|send|gave|give|transferred|transfer)\b/gi, " ")
+    .replace(ledgerWords, " ").replace(/[₦#]/g, " ").replace(/\s+/g, " ").replace(/^[\s:,–-]+|[\s:,–-]+$/g, "").trim();
+  // Keep "for ..." intact when there is one: it reads better
+  const forPart = body.match(/\bfor\s+(?:the\s+)?(.+?)$/i)?.[1]?.replace(/(?:₦|#)?\s?\d[\d,.]*\s*(k|m|thousand|million)?\b/gi, "").replace(ledgerWords, "").trim();
+  if (forPart && forPart.length > 2 && !forPart.toLowerCase().startsWith((who || "§").toLowerCase())) narration = forPart;
+  return finish({
+    date: date ? shiftDay(today, date[1]) : today, time: null, amount, fee: 0, currency: "NGN",
+    direction: income ? "credit" : "debit", counterparty: who.slice(0, 80), narration: narration.slice(0, 200), reference: "", bank: "", owner_name: "",
+  }, opts);
 }
 
 // Bank statement reader: turns the text of a PDF statement into transactions.
@@ -3037,9 +3169,10 @@ function tryItBlock() {
       <h3>Now try it: send your first one</h3>
       <ol>
         <li><b>Forward a receipt.</b> Open your bank app, tap a recent transfer, then <i>Share receipt</i> → WhatsApp → Egom.</li>
-        <li><b>Or just type it</b> in the Egom chat, like <span class="ex">2500 lunch</span> or <span class="ex">+50000 from Ada</span>.</li>
+        <li><b>Or just type it</b> in the Egom chat, like <span class="ex">2500 lunch</span> or <span class="ex">Ada paid me 50k</span>.</li>
       </ol>
       <a class="btn wa big" href="${waChat("2500 lunch")}" target="_blank" rel="noopener">${icon("chat")}Open the Egom chat</a>
+      <button type="button" class="btn" data-savecontact style="width:100%">${icon("person")}Save Egom to your contacts</button>
       <p class="fine">It shows up here a few seconds after Egom replies.</p>
     </div>`;
 }
@@ -3118,7 +3251,7 @@ function openSettings() {
     </div>
     <button class="btn primary" id="sSave" style="width:100%;margin-top:14px">Save</button>
     <label style="margin-top:20px">WhatsApp</label>
-    <div class="wa-row">${profile.whatsapp ? `<span>${icon("check")} ${esc(fmtPhone(profile.whatsapp))}</span><button class="btn" id="sUnlink">Unlink</button>` : `<span class="fine">Not linked yet</span><button class="btn primary" id="sLink">Link WhatsApp</button>`}</div>
+    <div class="wa-row">${profile.whatsapp ? `<span>${icon("check")} ${esc(fmtPhone(profile.whatsapp))}</span><button class="btn" id="sUnlink">Unlink</button>` + `</div><div class="wa-row"><span class="fine">Show the chat as "Egom", not a number</span><button class="btn" type="button" data-savecontact style="white-space:nowrap">Save contact</button>` : `<span class="fine">Not linked yet</span><button class="btn primary" id="sLink">Link WhatsApp</button>`}</div>
     <p class="fine">Egom's WhatsApp number: <b>${BOT_DISPLAY}</b></p>
     <label style="margin-top:20px">Appearance</label>
     <div class="toggle wide">${[["auto", "Auto"], ["light", "White"], ["dark", "Night"]].map(([k, v]) => `<button type="button" data-th="${k}" class="${getAppearance() === k ? "on" : ""}">${v}</button>`).join("")}</div>
@@ -3223,6 +3356,13 @@ function openDataSheet() {
     screenEmail(); toast("Your account and data have been deleted");
   };
 }
+// Saving the bot as a contact makes the chat show "Egom" on the phone straight away
+function saveEgomContact() {
+  const card = ["BEGIN:VCARD", "VERSION:3.0", "N:;Egom;;;", "FN:Egom", "ORG:Egom", `TEL;TYPE=CELL,VOICE:+${BOT_NUMBER}`, "URL:https://egom.ng", "NOTE:Your money assistant on WhatsApp. Forward receipts or type what you spent.", "END:VCARD"].join("\r\n");
+  saveFile("Egom.vcf", card, "text/vcard");
+  toast("Open the file to add Egom to your contacts");
+}
+document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-savecontact]"); if (b) { e.preventDefault(); saveEgomContact(); } });
 $("meBtn").onclick = openSettings;
 $("sideMe").onclick = openSettings;
 
