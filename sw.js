@@ -1,6 +1,8 @@
-// Egom service worker: works offline for the app shell, and shows push notifications.
-const CACHE = "egom-v1";
-const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/badge-96.png"];
+// Egom service worker: opens fast on slow networks, works offline, and shows push notifications.
+const CACHE = "egom-v3";
+const SHELL = ["/", "/app/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/badge-96.png"];
+// Libraries and fonts from other sites that never change under the same address: keep a copy
+const KEEP = ["cdn.jsdelivr.net", "fonts.googleapis.com", "fonts.gstatic.com"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -8,22 +10,42 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
-// The page: network first (so updates show at once), the saved copy when offline.
-// Everything else from this site: saved copy first. Other sites (Supabase, fonts, OCR): untouched.
+
+const save = (key, res) => { if (res && (res.ok || res.type === "opaque")) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(key, copy)); } return res; };
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-  if (url.origin !== location.origin) return;
-  if (req.mode === "navigate") {
-    e.respondWith(fetch(req).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put("/", copy)); return res; })
-      .catch(() => caches.match("/").then((r) => r || caches.match("/index.html"))));
+
+  // Libraries and fonts: the saved copy at once, refreshed in the background
+  if (KEEP.includes(url.hostname)) {
+    e.respondWith(caches.match(req).then((hit) => {
+      const net = fetch(req).then((res) => save(req, res)).catch(() => hit);
+      return hit || net;
+    }));
     return;
   }
-  e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-    if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
-    return res;
-  })));
+  if (url.origin !== location.origin) return;           // Supabase, OCR and the rest: untouched
+  if (url.searchParams.has("fresh")) return;            // the app checking for a new version
+
+  // Pages: the newest copy from the internet, but if that takes more than 3 seconds,
+  // the saved copy (the download carries on and is saved for next time)
+  if (req.mode === "navigate") {
+    const key = url.pathname.startsWith("/app") ? "/app/" : url.pathname;
+    const net = fetch(req).then((res) => save(key, res));
+    e.respondWith(new Promise((resolve) => {
+      let done = false;
+      const fallback = () => caches.match(key).then((r) => r || caches.match("/app/"));
+      const timer = setTimeout(() => fallback().then((r) => { if (r && !done) { done = true; resolve(r); } }), 3000);
+      net.then((res) => { if (!done) { done = true; clearTimeout(timer); resolve(res); } })
+        .catch(() => fallback().then((r) => { if (!done) { done = true; clearTimeout(timer); resolve(r || Response.error()); } }));
+    }));
+    e.waitUntil(net.catch(() => {}));
+    return;
+  }
+  // Everything else from this site: saved copy first
+  e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => save(req, res))));
 });
 
 // Push: { title, body, url, tag }
@@ -37,12 +59,14 @@ self.addEventListener("push", (e) => {
     badge: "/badge-96.png",
     tag: d.tag || undefined,
     renotify: !!d.tag,
-    data: { url: d.url || "/" },
+    data: { url: d.url || "/app/" },
   }));
 });
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
-  const target = new URL((e.notification.data && e.notification.data.url) || "/", location.origin).href;
+  let path = (e.notification.data && e.notification.data.url) || "/app/";
+  if (path === "/" || path.startsWith("/?")) path = "/app" + path;   // older messages pointed at the home page
+  const target = new URL(path, location.origin).href;
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
     for (const c of list) if (c.url.startsWith(location.origin)) { c.navigate(target).catch(() => {}); return c.focus(); }
     return self.clients.openWindow(target);

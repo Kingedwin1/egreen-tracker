@@ -3,7 +3,7 @@
   "short_name": "Egom",
   "description": "Money in. Money out. Clear. Track your spending from your receipts.",
   "id": "/",
-  "start_url": "/?source=app",
+  "start_url": "/app/?source=app",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -16,6 +16,6 @@
     { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Add a record", "url": "/?add=1", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+    { "name": "Add a record", "url": "/app/?add=1", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
   ]
 }
