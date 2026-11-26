@@ -878,18 +878,32 @@ html,body{background:var(--bg)}
 .tryit .btn .ico{width:18px;height:18px;margin-right:6px;vertical-align:-4px}
 .wa-nudge.first{border-color:color-mix(in srgb,var(--accent) 60%,transparent);background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
 .wa-nudge.first a.btn{text-decoration:none;white-space:nowrap}
-/* Business expenses list: search + filters, a table on laptops, rows on phones */
-.lf{padding:12px 14px}
-.lf-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.lf-q{flex:1 1 220px;display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:0 12px;color:var(--muted)}
+/* Business expenses list: one search pill, then filter chips that match the Invoices page */
+.lf{display:flex;flex-direction:column;gap:12px;margin:4px 0 8px}
+.lf-q{display:flex;align-items:center;gap:10px;height:46px;padding:0 16px;border-radius:999px;background:var(--glass,var(--surface));box-shadow:var(--glass-edge,var(--shadow));color:var(--muted)}
 .lf-q svg{width:18px;height:18px;flex:0 0 18px}
-.lf-q input{border:0;background:none;padding:10px 0;margin:0;flex:1;min-width:0;font:inherit;color:var(--ink);outline:none}
-.lf-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
-.lf-sel{display:flex;flex-direction:column;gap:3px;margin:0;font-size:12px;color:var(--muted);font-weight:600}
-.lf-sel select{margin:0;padding:8px 10px;font-size:14px;width:100%}
-.lf-sum{display:flex;align-items:center;gap:10px;margin:2px 4px 10px;font-size:13px;color:var(--ink-2)}
-.lf-sum b{margin-left:auto;font-size:15px;color:var(--ink)}
-.lf-sum .btn{padding:5px 12px;font-size:12.5px}
+.lf-q input{border:0;background:none;padding:0;margin:0;flex:1;min-width:0;height:100%;font:inherit;font-size:15px;color:var(--ink);outline:none;box-shadow:none}
+.lf-q:focus-within{box-shadow:0 0 0 2px var(--leaf)}
+.lf-chips{display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 1px}
+.lf-chips::-webkit-scrollbar{display:none}
+.lf-kind{display:inline-flex;gap:8px;flex:0 0 auto}
+.lf-kind button,.lf-chip{flex:0 0 auto;height:34px;padding:0 14px;border-radius:999px;border:0;background:var(--glass,var(--surface));box-shadow:var(--glass-edge,var(--shadow));color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.lf-kind button.on{background:var(--accent,var(--leaf));color:var(--on-lime,#0E0932);box-shadow:none}
+.lf-div{flex:0 0 1px;height:20px;background:var(--line);margin:0 4px}
+.lf-chip{position:relative;display:inline-flex;align-items:center;gap:6px;padding:0 12px 0 14px}
+.lf-chip .lf-chip-t{max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.lf-dn svg{width:14px;height:14px;display:block;color:var(--muted)}
+.lf-chip select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0;padding:0;border:0;font-size:16px}
+.lf-chip:focus-within{box-shadow:0 0 0 2px var(--leaf)}
+.lf-chip.on{background:var(--ink);color:var(--surface);box-shadow:none;padding-right:6px}
+.lf-chip.on .lf-dn svg{color:currentColor;opacity:.7}
+.lf-x{position:relative;z-index:1;display:grid;place-items:center;width:24px;height:24px;margin-left:2px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:inherit;cursor:pointer;padding:0}
+.lf-x svg{width:13px;height:13px}
+.lf-sum{display:flex;align-items:baseline;gap:10px;margin:6px 4px 10px;font-size:13px;color:var(--muted)}
+.lf-tot{margin-left:auto;display:flex;align-items:baseline;gap:6px}
+.lf-tot small{font-size:12px;color:var(--muted)}
+.lf-tot b{font-size:17px;color:var(--ink);font-variant-numeric:tabular-nums}
+.lf-clear{border:0;background:none;padding:0;font:inherit;font-weight:600;color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .lf-tablewrap{display:none;padding:0;overflow:hidden}
 .lf-table{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
 .lf-table .c-date{width:78px}.lf-table .c-who{width:32%}.lf-table .c-acct{width:118px}.lf-table .c-amt{width:128px}.lf-table col.c-note{width:20%}
@@ -907,11 +921,11 @@ html,body{background:var(--bg)}
 .lf-cat{display:inline-flex;align-items:center;gap:7px}
 .lf-cat i{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
 @media (min-width:1024px){
-  .lf-row{grid-template-columns:repeat(4,minmax(0,1fr))}
   .lf-tablewrap{display:block}
   .lf-cards{display:none}
 }
 @media (min-width:1024px) and (max-width:1279px){.lf-table .c-note{display:none}.lf-table col.c-note{width:0}}
+@media (min-width:1280px){.lf-table .c-who{width:26%}.lf-table col.c-note{width:18%}}
 </style>
 </head>
 <body><div id="blobs" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i></div>
@@ -1537,7 +1551,7 @@ ICON["Salary"] = "💼"; ICON["Sales & Customer Payments"] = "🧾"; ICON["Gifts
 
 /* ============ Egom line icons (2px stroke, round ends) ============ */
 const IC = {
-  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>', chev: '<path d="m9 6 6 6-6 6"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>', chev: '<path d="m9 6 6 6-6 6"/>', chevDown: '<path d="m6 9 6 6 6-6"/>',
   in: '<path d="M17 7 7 17"/><path d="M7 9v8h8"/>', out: '<path d="M7 17 17 7"/><path d="M9 7h8v8"/>',
   receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
@@ -2101,18 +2115,24 @@ function listView() {
   const uniq = (f) => [...new Set(pool.map(f).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   const whos = uniq(whoOf), cats = uniq((r) => r.category), accts = uniq((r) => r.bank);
   [["who", whos], ["cat", cats], ["acct", accts]].forEach(([k, l]) => { if (LF[k] && !l.includes(LF[k])) LF[k] = ""; });
-  const sel = (id, label, all, list, v) => `<label class="lf-sel"><span>${label}</span><select id="${id}"><option value="">${all}</option>${list.map((x) => `<option value="${esc(x)}"${x === v ? " selected" : ""}>${esc(id === "lfWho" ? niceName(x) : x)}</option>`).join("")}</select></label>`;
-  return `<div class="card lf">
-      <div class="lf-top"><div class="lf-q">${icon("search")}<input id="lfQ" type="search" value="${esc(LF.q)}" placeholder="Search who, note, amount or reference" aria-label="Search records" autocomplete="off"></div>
-        <div class="toggle">${[["out", "Spent"], ["in", "Received"], ["all", "All"]].map(([k, l]) => `<button type="button" data-lk="${k}" class="${LF.kind === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
-      <div class="lf-row">${sel("lfWho", "Vendor", "All vendors", whos, LF.who)}${sel("lfCat", "Category", "All categories", cats, LF.cat)}${sel("lfAcct", "Account", "All accounts", accts, LF.acct)}
-        <label class="lf-sel"><span>When</span><select id="lfScope"><option value="month"${LF.scope === "month" ? " selected" : ""}>${esc(monthTitle(ym))}</option><option value="all"${LF.scope === "all" ? " selected" : ""}>All time</option></select></label></div>
+  // Each filter is a pill like the Invoices chips; a hidden native picker sits on top so phones get their own list
+  const chip = (id, k, label, list, show) => { const v = LF[k], on = !!v;
+    return `<span class="lf-chip${on ? " on" : ""}"><span class="lf-chip-t">${on ? esc(show(v)) : label}</span><i class="lf-dn">${icon("chevDown")}</i><select id="${id}" aria-label="${label}"><option value="">${on ? "All " + label.toLowerCase() + "s" : label + ": all"}</option>${list.map((x) => `<option value="${esc(x)}"${x === v ? " selected" : ""}>${esc(show(x))}</option>`).join("")}</select>${on ? `<button type="button" class="lf-x" data-clear="${k}" aria-label="Clear ${label.toLowerCase()}">${icon("close")}</button>` : ""}</span>`; };
+  const when = `<span class="lf-chip${LF.scope === "all" ? " on" : ""}"><span class="lf-chip-t">${LF.scope === "all" ? "All time" : esc(monthTitle(ym))}</span><i class="lf-dn">${icon("chevDown")}</i><select id="lfScope" aria-label="When"><option value="month"${LF.scope === "month" ? " selected" : ""}>${esc(monthTitle(ym))}</option><option value="all"${LF.scope === "all" ? " selected" : ""}>All time</option></select></span>`;
+  return `<div class="lf">
+      <div class="lf-q">${icon("search")}<input id="lfQ" type="search" value="${esc(LF.q)}" placeholder="Search who, note, amount or reference" aria-label="Search records" autocomplete="off"></div>
+      <div class="lf-chips">
+        <div class="lf-kind" role="group" aria-label="Show">${[["out", "Spent"], ["in", "Received"], ["all", "All"]].map(([k, l]) => `<button type="button" data-lk="${k}" aria-pressed="${LF.kind === k}" class="${LF.kind === k ? "on" : ""}">${l}</button>`).join("")}</div>
+        <span class="lf-div" aria-hidden="true"></span>
+        ${chip("lfWho", "who", "Vendor", whos, niceName)}${chip("lfCat", "cat", "Category", cats, (x) => x)}${chip("lfAcct", "acct", "Account", accts, (x) => x)}${when}
+      </div>
     </div><div id="lfOut">${listOut()}</div>`;
 }
 function listOut() {
   const list = listRows(), total = list.reduce((t, r) => t + (r.kind === "income" ? Number(r.amount) : spend(r)), 0);
   const any = LF.q || LF.who || LF.cat || LF.acct;
-  const sumLine = `<div class="lf-sum"><span>${list.length} record${list.length === 1 ? "" : "s"}${any ? " match" : ""}</span><b>${money(total)}</b>${any ? `<button class="btn" id="lfClear" type="button">Clear filters</button>` : ""}</div>`;
+  const word = LF.kind === "out" ? "spent" : LF.kind === "in" ? "received" : "net";
+  const sumLine = `<div class="lf-sum"><span>${list.length} record${list.length === 1 ? "" : "s"}${any ? ` · <button class="lf-clear" id="lfClear" type="button">Clear filters</button>` : ""}</span><span class="lf-tot"><small>${word}</small><b>${money(total)}</b></span></div>`;
   if (!list.length) return sumLine + `<div class="empty">${rows.filter(inLedger).length ? "Nothing matches. Try another filter or All time." : "No records yet. Forward a receipt to Egom on WhatsApp, or tap + to add one."}</div>`;
   const amt = (r) => r.kind === "income" ? `<b class="inc">+${money(r.amount)}</b>` : `<b class="exp">-${money(spend(r))}</b>`;
   const shown = list.slice(0, 400);
@@ -2133,6 +2153,7 @@ function wireList() {
   };
   $("lfQ").oninput = () => { LF.q = $("lfQ").value; out(); };
   [["lfWho", "who"], ["lfCat", "cat"], ["lfAcct", "acct"], ["lfScope", "scope"]].forEach(([id, k]) => $(id).onchange = () => { LF[k] = $(id).value; renderTx(); });
+  $("view").querySelectorAll("[data-clear]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); LF[b.dataset.clear] = ""; renderTx(); });
   $("view").querySelectorAll("[data-lk]").forEach((b) => b.onclick = () => { LF.kind = b.dataset.lk; renderTx(); });
   wireOut();
 }
